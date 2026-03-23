@@ -1,0 +1,97 @@
+import { Pharmacy, Medicine, MedicineVariant, InventoryItem } from '@/types/pharmacy';
+
+export const mockPharmacies: Pharmacy[] = [
+  {
+    id: '1',
+    name: 'Kalafi Pharmacy',
+    address: 'Plot 21104,Buchbuch Road Village,Gaborone',
+    latitude: 36.7538,
+    longitude: 3.0588,
+    phone: '+267 311 5929',
+    whatsapp: '+267 74151608',
+    verified: true,
+    operatingHours: '08:00 - 22:00',
+    distance: 0.8,
+    travelTime: 5,
+  },
+  {
+    id: '2',
+    name: 'Tlokweng Pharmacy',
+    address: 'Plot 10114,Bordergate Mall,Tlokweng',
+    latitude: 36.7600,
+    longitude: 3.0500,
+    phone: '+267 313 2223',
+    verified: true,
+    operatingHours: '08:30 - 20:00',
+    distance: 1.2,
+    travelTime: 8,
+  },
+  {
+    id: '3',
+    name: 'Pulse Pharmacy',
+    address: '18116 Mahuhumetsa,Gaborone',
+    latitude: 36.7480,
+    longitude: 3.0650,
+    phone: '+267 311 2507',
+    whatsapp: '+267 74151608',
+    verified: false,
+    operatingHours: '09:00 - 21:00',
+    distance: 9.6,
+    travelTime: 21,
+  },
+  {
+    id: '4',
+    name: 'Notwane Pharmacy',
+    address: 'Plot 1146 Main Mall, Gaborone',
+    latitude: -24.6585638,
+    longitude: 25.918018,
+    phone: '+267 3951853',
+    verified: true,
+    operatingHours: '24h/24',
+    distance: 9.6,
+    travelTime: 18,
+  },
+  {
+    id: '5',
+    name: 'Noble Pharmacy',
+    address: 'Unit G37A, Plot 471 Rail Park Mall,Gaborone',
+    latitude: 36.7550,
+    longitude: 3.0420,
+    phone: '+267 76914814',
+    whatsapp: '+267 311 215',
+    verified: true,
+    operatingHours: '08:30 - 19:30',
+    distance: 21,
+    travelTime: 21,
+  },
+];
+
+export const mockMedicines: Medicine[] = [
+  { id: '1', genericName: 'Paracetamol', atcCode: 'N02BE01', category: 'Analgesic', description: 'Pain reliever and fever reducer' },
+  { id: '2', genericName: 'Amoxicillin', atcCode: 'J01CA04', category: 'Antibiotic', description: 'Broad-spectrum antibiotic' },
+  { id: '3', genericName: 'Omeprazole', atcCode: 'A02BC01', category: 'Proton pump inhibitor', description: 'Reduces stomach acid production' },
+  { id: '4', genericName: 'Metformin', atcCode: 'A10BA02', category: 'Antidiabetic', description: 'Controls blood sugar levels' },
+  { id: '5', genericName: 'Ibuprofen', atcCode: 'M01AE01', category: 'NSAID', description: 'Anti-inflammatory pain reliever' },
+];
+
+export const mockVariants: MedicineVariant[] = [
+  { id: '1', medicineId: '1', brandName: 'Doliprane', strength: '500mg', form: 'Tablet' },
+  { id: '2', medicineId: '1', brandName: 'Efferalgan', strength: '1g', form: 'Effervescent' },
+  { id: '3', medicineId: '2', brandName: 'Clamoxyl', strength: '500mg', form: 'Capsule' },
+  { id: '4', medicineId: '3', brandName: 'Mopral', strength: '20mg', form: 'Capsule' },
+  { id: '5', medicineId: '4', brandName: 'Glucophage', strength: '850mg', form: 'Tablet' },
+  { id: '6', medicineId: '5', brandName: 'Brufen', strength: '400mg', form: 'Tablet' },
+];
+
+export const mockInventory: InventoryItem[] = [
+  { id: '1', pharmacyId: '1', medicineVariantId: '1', price: 150, quantity: 45, status: 'in_stock', lastUpdated: '2026-03-04' },
+  { id: '2', pharmacyId: '2', medicineVariantId: '1', price: 160, quantity: 12, status: 'in_stock', lastUpdated: '2026-03-04' },
+  { id: '3', pharmacyId: '3', medicineVariantId: '1', price: 145, quantity: 0, status: 'out_of_stock', lastUpdated: '2026-03-03' },
+  { id: '4', pharmacyId: '1', medicineVariantId: '2', price: 280, quantity: 20, status: 'in_stock', lastUpdated: '2026-03-04' },
+  { id: '5', pharmacyId: '4', medicineVariantId: '1', price: 155, quantity: 3, status: 'low_stock', lastUpdated: '2026-03-04' },
+  { id: '6', pharmacyId: '5', medicineVariantId: '3', price: 350, quantity: 30, status: 'in_stock', lastUpdated: '2026-03-04' },
+  { id: '7', pharmacyId: '1', medicineVariantId: '3', price: 340, quantity: 8, status: 'in_stock', lastUpdated: '2026-03-04' },
+  { id: '8', pharmacyId: '2', medicineVariantId: '4', price: 420, quantity: 15, status: 'in_stock', lastUpdated: '2026-03-04' },
+  { id: '9', pharmacyId: '3', medicineVariantId: '5', price: 250, quantity: 50, status: 'in_stock', lastUpdated: '2026-03-04' },
+  { id: '10', pharmacyId: '5', medicineVariantId: '6', price: 180, quantity: 2, status: 'low_stock', lastUpdated: '2026-03-03' },
+];

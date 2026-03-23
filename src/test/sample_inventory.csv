@@ -1,0 +1,101 @@
+medicine_name,stock_level,price
+Panado,150,12.50
+Grandpa Headache Powder,200,8.99
+Disprin,120,15.00
+Voltaren Emulgel,45,89.99
+Ibuprofen 400mg,180,24.50
+Amoxicillin 500mg,60,45.00
+Augmentin 625mg,40,189.99
+Ciprofloxacin 500mg,55,78.50
+Metronidazole 400mg,70,35.00
+Doxycycline 100mg,50,52.00
+Omeprazole 20mg,130,38.00
+Losec 20mg,80,145.00
+Nexium 40mg,65,210.00
+Gaviscon,90,67.50
+Buscopan,110,42.00
+Allergex,140,28.00
+Zyrtec 10mg,95,89.00
+Flixonase Nasal Spray,35,145.00
+Ventolin Inhaler,45,189.00
+Seretide 250 Inhaler,20,650.00
+Beconase Nasal Spray,30,120.00
+Metformin 500mg,200,18.00
+Glucophage 850mg,160,32.00
+Januvia 100mg,40,380.00
+Amlodipine 5mg,170,22.00
+Atenolol 50mg,190,15.50
+Lisinopril 10mg,150,19.00
+Simvastatin 20mg,140,28.00
+Rosuvastatin 10mg,110,145.00
+Atorvastatin 40mg,130,89.00
+Warfarin 5mg,80,25.00
+Aspirin 100mg,200,8.50
+Clopidogrel 75mg,90,65.00
+Furosemide 40mg,160,12.00
+Hydrochlorothiazide 25mg,180,9.50
+Prednisone 5mg,100,18.00
+Betamethasone Cream,75,55.00
+Hydrocortisone Cream,85,38.00
+Canesten Cream,60,89.00
+Diflucan 150mg,50,145.00
+Flagyl 400mg,90,32.00
+Bactrim DS,70,45.00
+Doxylamine,120,35.00
+Stilnox 10mg,30,189.00
+Rivotril 0.5mg,25,145.00
+Sertraline 50mg,65,85.00
+Fluoxetine 20mg,70,65.00
+Escitalopram 10mg,55,120.00
+Amitriptyline 25mg,60,28.00
+Epilim 200mg,45,189.00
+Lamictal 100mg,35,320.00
+Neurontin 300mg,50,145.00
+Lyrica 75mg,40,290.00
+Concerta 36mg,20,850.00
+Ritalin 10mg,25,420.00
+Vitamin C 1000mg,250,45.00
+Vitamin D3 1000IU,200,65.00
+Calcium 600mg,180,55.00
+Iron Ferrous 200mg,160,22.00
+Folic Acid 5mg,220,12.00
+Bactroban Nasal Ointment,40,145.00
+Zovirax Cream,55,89.00
+Eye Mo Eye Drops,100,38.00
+Visine Eye Drops,90,42.00
+Otosporin Ear Drops,45,125.00
+Waxsol Ear Drops,50,95.00
+Rennies,180,25.00
+Activated Charcoal,70,55.00
+Loperamide 2mg,130,28.00
+Imodium,120,42.00
+Dulcolax 5mg,110,38.00
+Senokot,100,35.00
+Lactulose Syrup,80,65.00
+Benylin Chesty Cough,140,89.00
+Linctagon Forte,160,45.00
+Corenza C,190,38.00
+Flu Buster,170,32.00
+Demazin Syrup,90,55.00
+Iliadin Nasal Drops,75,65.00
+Otrivin,80,58.00
+Strepsils,200,32.00
+Betadine Gargle,60,78.00
+Voltaren 50mg Tablets,95,65.00
+Cataflam 50mg,85,72.00
+Celebrex 200mg,50,189.00
+Arcoxia 90mg,45,225.00
+Myprodol,150,38.00
+Adco-Dol,140,28.00
+Syndol,130,42.00
+Stilpane,110,35.00
+Paracetamol 500mg,300,9.50
+Codeine Phosphate 30mg,60,45.00
+Tramadol 50mg,55,78.00
+Morphine 10mg,15,320.00
+Ozempic 0.5mg,10,1850.00
+Trulicity 1.5mg,12,1650.00
+Jardiance 10mg,30,780.00
+Janumet 50mg,35,520.00
+Eliquis 5mg,25,890.00
+Xarelto 20mg,22,950.00
