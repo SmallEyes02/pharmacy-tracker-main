@@ -1,75 +1,97 @@
-<<<<<<< HEAD
+# 💊 Pharmacy Tracker Application
 
-# Welcome to Pharmacy Locator Web app
+## 📌 Project Overview
 
-## Project info
+The **Pharmacy Tracker Application** is a web-based system designed to help users locate nearby pharmacies, check medicine availability, and make reservations in real time.
 
-_Project title:_ Pharmacy Tracker Application
-*Description:*loading
-*Features:*loading and you would love them
+The system improves access to healthcare by providing:
 
-## Technical Architecture & Stack
+- Location-based pharmacy search
+- Medicine availability tracking
+- Reservation and management features
+- Administrative control over pharmacies and users
 
-This project is built as a highly performance Single-Page Application (SPA) utilizing a Serverless/BaaS (Backend-as-a-Service) architecture. By leveraging Supabase, the system maintains a thin client-side logic layer with a robust, secure database-level enforcement layer.
+---
 
-## Frontend Development
+## 🚀 Key Features
 
-_Core Framework:_ React 18 with TypeScript for type-safe development.
-_Build Tool:_ Vite (configured for SPA with client-side routing via React Router v6).
-_Styling & UI:_ Tailwind CSS: Utility-first styling for rapid UI development.
-_shadcn/ui:_ Accessible, headless components built on Radix UI primitives.
+- 🔍 Search for medicines across nearby pharmacies
+- 📍 Geolocation-based pharmacy discovery
+- 🏥 Pharmacy inventory management (Pharmacist dashboard)
+- 📦 Medicine reservation system
+- ⏱️ Automatic reservation expiry
+- 🛠️ Admin approval and user management
+- 🗺️ Interactive map with route directions
 
-## Backend & Infrastructure (Supabase Ecosystem)
+---
 
--The application utilizes a decentralized backend approach, removing the need for a traditional middleware server (Express/Node.js).
+## 🏗️ System Architecture
 
-_API Layer_: PostgREST (Supabase) provides an auto-generated, performant REST API directly from the database schema.
+This project is built as a **Single-Page Application (SPA)** using a **Serverless/BaaS architecture** powered by Supabase.
 
-_Compute:_ Supabase Edge Functions (Deno/TypeScript) handle privileged operations, including:_Pharmacy approval workflows_ and
-_Administrative user management._
+- Thin frontend (client-side logic)
+- Backend logic enforced at database level
+- No traditional Node.js server required
 
-_Automation:_ Database Triggers: Real-time business logic (stock decrement, reference generation).
+---
 
-_pg_cron:_ Scheduled tasks, specifically hourly reservation expiry checks.
+## 💻 Frontend Stack
 
-## Data Management
+- **Framework:** React 18 + TypeScript
+- **Build Tool:** Vite
+- **Routing:** React Router v6
+- **Styling:** Tailwind CSS
+- **UI Components:** shadcn/ui (Radix UI primitives)
 
-_Database:_ PostgreSQL 14 (Supabase Managed).
+---
 
-_Geospatial Data:_ PostGIS Extension for handling geographic coordinates.
-Pharmacy locations are stored using geography(Point, 4326).
+## ☁️ Backend & Infrastructure (Supabase)
 
-_Security:_ Row Level Security (RLS) policies ensure that data access is restricted at the database level based on the authenticated user's identity.
+- **Database:** PostgreSQL 14 (Managed by Supabase)
+- **API Layer:** Auto-generated REST API via PostgREST
+- **Authentication:** Supabase Auth
+- **Edge Functions:**
+  - Pharmacy approval workflows
+  - Admin user management
 
-## Geolocation & Mapping-
+- **Automation:**
+  - Database triggers (stock updates, ID generation)
+  - Scheduled jobs using pg_cron (reservation expiry)
 
-The system implements a custom geospatial engine to handle proximity searches and route visualization.
-_Distance Logic:_ Acquisition: Browser Geolocation API (Network coarse fix- GPS refinement).
-_Calculation:_ TypeScript implementation of the Haversine Formula for great-circle distance.
-_Decoding:_ Client-side parsing of PostGIS EWKB hex coordinates.*Visuals & Routing:*React Leaflet: For interactive map rendering using OpenStreetMap (OSM) tiles.OSRM API: Used for walking route calculations and turn-by-turn directions.
-**URL**:
+---
 
-## How to edit this code?
+## 🗄️ Data & Security
 
-**Use your preferred IDE**
+- **Geospatial Support:** PostGIS
+  - Stores pharmacy locations as `geography(Point, 4326)`
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Security:** Row Level Security (RLS)
+  - Ensures users only access authorized data
 
-Setup instructions,Follow these steps:
+---
 
-# Step 1: Install the necessary dependencies.
+## 🌍 Geolocation & Mapping
 
-npm i
+- **Location Detection:** Browser Geolocation API
+- **Distance Calculation:** Haversine Formula (TypeScript)
+- **Map Rendering:** React Leaflet (OpenStreetMap)
+- **Routing:** OSRM API for directions
 
-# Step 2: Start the development server with auto-reloading and an instant preview.
+---
 
+## ⚙️ Setup & Installation
+
+### Prerequisites
+
+- Node.js (v16 or higher recommended)
+- npm
+
+### Installation Steps
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
-
-```
-
-# pharmacy-tracker-main
-
-Locator system to view nearby pharmacies for your medical needs.
-
-> > > > > > > adf16d65bbe8ccc41f59aa5145d69a84468211ac
 ```
