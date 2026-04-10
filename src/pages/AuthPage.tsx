@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Pill, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Pill, Mail, Lock, User, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/Header';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,7 @@ const AuthPage = () => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -41,9 +42,6 @@ const AuthPage = () => {
     } else if (userRole === 'pharmacist') {
       navigate('/pharmacist', { replace: true });
     } else {
-      // No role assigned yet — could be a pending pharmacist.
-      // Send to /pharmacist which handles all states:
-      // pending → locked dashboard, approved → full access, no app → redirect home.
       navigate('/pharmacist', { replace: true });
     }
   } catch (err) {
@@ -57,14 +55,12 @@ const AuthPage = () => {
     setLoading(true);
 
     if (isLogin) {
-      // Use the auth result to get the user ID
       const result = await signIn(email, password);
       
       if (result && 'error' in result && result.error) {
         toast.error(result.error.message);
         setLoading(false);
       } else {
-        // Fetch the user session to ensure we have the ID for the redirect
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await handleRoleBasedRedirect(user.id);
@@ -148,14 +144,26 @@ const AuthPage = () => {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
-                    className="pl-9"
+                    className="pl-9 pr-10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
             </CardContent>

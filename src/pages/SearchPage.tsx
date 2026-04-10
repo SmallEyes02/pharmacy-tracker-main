@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/Header';
@@ -139,21 +140,27 @@ const sortByDistance = (items: any[]) =>
 // ── Component ──────────────────────────────────────────────────────────────────
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
-  const query = searchParams.get('q') || '';
+  const query      = searchParams.get('q') || '';
+  const forMed     = searchParams.get('for') || '';       // original out-of-stock medicine name
+  const isAltMode  = searchParams.get('alternatives') === '1'; // came from "See alternatives" card
 
   const { userLocation } = useLocationContext();
 
   // Raw results from Supabase — fetched once per query
-  const [rawResults, setRawResults] = useState<RawResult[]>([]);
+  const [rawResults, setRawResults]         = useState<RawResult[]>([]);
   // Enriched results with distance — recalculated when location changes
-  const [results, setResults]       = useState<any[]>([]);
-  const [isLoading, setIsLoading]   = useState(false);
+  const [results, setResults]               = useState<any[]>([]);
+  const [isLoading, setIsLoading]           = useState(false);
+  // Alternative medicines shown when all results are out of stock
+  const [alternatives, setAlternatives]     = useState<{ id: string; name: string; strength: string | null; dosage_form: string | null; category: string | null }[]>([]);
+  const [altLoading, setAltLoading]         = useState(false);
 
   // ── Step 1: Fetch from Supabase when query changes ────────────────────────
   useEffect(() => {
     if (!query.trim()) {
       setRawResults([]);
       setResults([]);
+      setAlternatives([]);
       return;
     }
 
@@ -185,6 +192,48 @@ const SearchPage = () => {
         ) as RawResult[];
 
         setRawResults(valid);
+
+        // ── Fetch alternatives if all results are out of stock ────────────
+        const allOutOfStock = valid.length > 0 && valid.every((r: any) => r.stock_level === 0);
+        const noResults     = valid.length === 0;
+
+        if (allOutOfStock || noResults) {
+          setAltLoading(true);
+          try {
+            // Find medicine IDs matching the query
+            const { data: matchedMeds } = await (supabase as any)
+              .from('medicines')
+              .select('id')
+              .or(`name.ilike.%${query}%,category.ilike.%${query}%`);
+
+            if (matchedMeds?.length) {
+              const medIds = matchedMeds.map((m: any) => m.id);
+              // Fetch alternatives for those medicines
+              const { data: altData } = await (supabase as any)
+                .from('medicine_alternatives')
+                .select('alternative_id, medicines!alternative_id(id, name, strength, dosage_form, category)')
+                .in('medicine_id', medIds)
+                .limit(6);
+
+              const alts = (altData ?? [])
+                .map((a: any) => a.medicines)
+                .filter(Boolean)
+                // Remove duplicates
+                .filter((m: any, i: number, arr: any[]) => arr.findIndex(x => x.id === m.id) === i);
+
+              setAlternatives(alts);
+            } else {
+              setAlternatives([]);
+            }
+          } catch {
+            setAlternatives([]);
+          } finally {
+            setAltLoading(false);
+          }
+        } else {
+          setAlternatives([]);
+        }
+
       } catch (err: any) {
         console.error('[SearchPage] fetch error:', err);
         toast.error('Search failed: ' + err.message);
@@ -212,6 +261,23 @@ const SearchPage = () => {
         <div className="mx-auto max-w-2xl mb-8">
           <MedicineSearchBar />
         </div>
+
+        {/* Alternatives context banner — shown when navigated from a card's "See alternatives" */}
+        {isAltMode && forMed && !isLoading && (
+          <div className="mx-auto max-w-4xl mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-destructive">
+                {forMed} is out of stock
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Showing medicines that may be used as alternatives to{' '}
+                <span className="font-semibold text-foreground">{forMed}</span>.
+                These are not automatic substitutes — please confirm with your pharmacist or doctor before switching.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Location banner */}
         {!userLocation && query && !isLoading && (
@@ -253,6 +319,84 @@ const SearchPage = () => {
                 <p>Find real-time stock and prices in Gaborone</p>
               </div>
             ) : null}
+
+            {/* ── Alternative medicines suggestion ── */}
+            {!isLoading && query && alternatives.length > 0 && (
+              <div className="mt-10">
+                {/* Context banner */}
+                <div className={`rounded-xl border p-4 mb-6 flex items-start gap-3 ${
+                  results.length === 0
+                    ? 'border-warning/30 bg-warning/8'
+                    : 'border-destructive/30 bg-destructive/8'
+                }`}>
+                  <AlertTriangle className={`h-5 w-5 shrink-0 mt-0.5 ${
+                    results.length === 0 ? 'text-warning' : 'text-destructive'
+                  }`} />
+                  <div>
+                    <p className={`font-semibold text-sm ${
+                      results.length === 0 ? 'text-warning' : 'text-destructive'
+                    }`}>
+                      {results.length === 0
+                        ? `"${query}" was not found in any Gaborone pharmacy`
+                        : `"${query}" is currently out of stock at all pharmacies`}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      The medicines below are recorded alternatives to{' '}
+                      <span className="font-semibold text-foreground">{query}</span>.
+                      They may have the same therapeutic effect — consult your pharmacist or doctor before switching.
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Pill className="h-4 w-4 text-primary" />
+                  Suggested alternatives for &ldquo;{query}&rdquo;
+                </p>
+
+                {altLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {alternatives.map(alt => (
+                      <button
+                        key={alt.id}
+                        onClick={() => {
+                          const params = new URLSearchParams(window.location.search);
+                          params.set('q', alt.name);
+                          window.location.search = params.toString();
+                        }}
+                        className="rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/50 hover:shadow-md group"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-heading font-semibold text-card-foreground group-hover:text-primary transition-colors truncate">
+                              {alt.name}
+                              {alt.strength ? ` ${alt.strength}` : ''}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {alt.dosage_form ?? 'Medicine'}
+                              {alt.category ? ` • ${alt.category}` : ''}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full whitespace-nowrap">
+                            Check stock →
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2 border-t border-border/60 pt-2">
+                          Alternative to <span className="font-semibold text-foreground">{query}</span> · tap to check pharmacy availability
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mt-4 text-xs text-muted-foreground text-center">
+                  Always confirm with a licensed pharmacist before substituting any medication.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

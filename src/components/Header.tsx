@@ -18,13 +18,18 @@ const Header = () => {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isPharmacist, setIsPharmacist] = useState(false);
+  const [displayName, setDisplayName]   = useState<string | null>(null);
   const { user, signOut } = useAuth();
 
   useEffect(() => {
     const check = async () => {
-      if (!user) { setIsPharmacist(false); return; }
-      const { data } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'pharmacist' });
-      setIsPharmacist(!!data);
+      if (!user) { setIsPharmacist(false); setDisplayName(null); return; }
+      const [roleRes, profileRes] = await Promise.all([
+        supabase.rpc('has_role', { _user_id: user.id, _role: 'pharmacist' }),
+        (supabase as any).from('profiles').select('full_name').eq('user_id', user.id).single(),
+      ]);
+      setIsPharmacist(!!roleRes.data);
+      setDisplayName(profileRes.data?.full_name ?? null);
     };
     check();
   }, [user]);
@@ -57,7 +62,7 @@ const Header = () => {
               <Button
                 variant={location.pathname === link.to ? 'secondary' : 'ghost'}
                 size="sm"
-                className="font-medium"
+                className="font-medium text-base"
               >
                 {link.label}
               </Button>
@@ -68,7 +73,14 @@ const Header = () => {
         <div className="hidden items-center gap-2 md:flex">
           {user ? (
             <>
-              <span className="text-sm text-muted-foreground truncate max-w-[160px]">{user.email}</span>
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {(displayName ?? user.email ?? 'U')[0].toUpperCase()}
+                </div>
+                <span className="text-sm font-medium text-foreground truncate max-w-[140px]">
+                  {displayName ?? user.email}
+                </span>
+              </div>
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-1" /> Sign Out
               </Button>
@@ -110,9 +122,14 @@ const Header = () => {
             ))}
             <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
               {user ? (
-                <Button variant="ghost" onClick={handleSignOut}>
-                  <LogOut className="h-4 w-4 mr-1" /> Sign Out
-                </Button>
+                <>
+                  <div className="px-2 py-1 text-sm font-medium text-foreground">
+                    👤 {displayName ?? user.email}
+                  </div>
+                  <Button variant="ghost" onClick={handleSignOut} className="w-full justify-start">
+                    <LogOut className="h-4 w-4 mr-1" /> Sign Out
+                  </Button>
+                </>
               ) : (
                 <>
                   <Link to="/auth" onClick={() => setMobileOpen(false)}>

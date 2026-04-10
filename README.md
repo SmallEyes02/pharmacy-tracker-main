@@ -1,73 +1,75 @@
-# Welcome to your Lovable project
+<<<<<<< HEAD
+
+# Welcome to Pharmacy Locator Web app
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+_Project title:_ Pharmacy Tracker Application
+*Description:*loading
+*Features:*loading and you would love them
 
-## How can I edit this code?
+## Technical Architecture & Stack
 
-There are several ways of editing your application.
+This project is built as a highly performance Single-Page Application (SPA) utilizing a Serverless/BaaS (Backend-as-a-Service) architecture. By leveraging Supabase, the system maintains a thin client-side logic layer with a robust, secure database-level enforcement layer.
 
-**Use Lovable**
+## Frontend Development
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+_Core Framework:_ React 18 with TypeScript for type-safe development.
+_Build Tool:_ Vite (configured for SPA with client-side routing via React Router v6).
+_Styling & UI:_ Tailwind CSS: Utility-first styling for rapid UI development.
+_shadcn/ui:_ Accessible, headless components built on Radix UI primitives.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Backend & Infrastructure (Supabase Ecosystem)
+
+-The application utilizes a decentralized backend approach, removing the need for a traditional middleware server (Express/Node.js).
+
+_API Layer_: PostgREST (Supabase) provides an auto-generated, performant REST API directly from the database schema.
+
+_Compute:_ Supabase Edge Functions (Deno/TypeScript) handle privileged operations, including:_Pharmacy approval workflows_ and
+_Administrative user management._
+
+_Automation:_ Database Triggers: Real-time business logic (stock decrement, reference generation).
+
+_pg_cron:_ Scheduled tasks, specifically hourly reservation expiry checks.
+
+## Data Management
+
+_Database:_ PostgreSQL 14 (Supabase Managed).
+
+_Geospatial Data:_ PostGIS Extension for handling geographic coordinates.
+Pharmacy locations are stored using geography(Point, 4326).
+
+_Security:_ Row Level Security (RLS) policies ensure that data access is restricted at the database level based on the authenticated user's identity.
+
+## Geolocation & Mapping-
+
+The system implements a custom geospatial engine to handle proximity searches and route visualization.
+_Distance Logic:_ Acquisition: Browser Geolocation API (Network coarse fix- GPS refinement).
+_Calculation:_ TypeScript implementation of the Haversine Formula for great-circle distance.
+_Decoding:_ Client-side parsing of PostGIS EWKB hex coordinates.*Visuals & Routing:*React Leaflet: For interactive map rendering using OpenStreetMap (OSM) tiles.OSRM API: Used for walking route calculations and turn-by-turn directions.
+**URL**:
+
+## How to edit this code?
 
 **Use your preferred IDE**
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Follow these steps:
+Setup instructions,Follow these steps:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Step 1: Install the necessary dependencies.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 2: Start the development server with auto-reloading and an instant preview.
+
 npm run dev
+
 ```
 
-**Edit a file directly in GitHub**
+# pharmacy-tracker-main
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Locator system to view nearby pharmacies for your medical needs.
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+> > > > > > > adf16d65bbe8ccc41f59aa5145d69a84468211ac
+```

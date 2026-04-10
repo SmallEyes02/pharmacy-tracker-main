@@ -15,6 +15,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   Clock, CheckCircle, Package, XCircle, RefreshCw, Building2, Store,
   LockKeyhole, AlertTriangle, LayoutDashboard, ClipboardList,
   FlaskConical, BarChart3, LogOut, Pencil, Trash2, Plus,
@@ -29,6 +32,7 @@ interface Reservation {
   quantity: number;
   status: string;
   requested_at: string;
+  reference?: string | null;
   medicine_name?: string;
   pharmacy_name?: string;
 }
@@ -69,6 +73,7 @@ const PharmacistDashboard = () => {
   const navigate = useNavigate();
 
   const [approvalStatus, setApprovalStatus] = useState<'loading' | 'pending' | 'approved' | 'rejected'>('loading');
+  const [pharmacistName, setPharmacistName] = useState<string | null>(null);
   const [application, setApplication]       = useState<PharmacyApplication | null>(null);
   const [myPharmacies, setMyPharmacies]     = useState<{
     id: string; name: string; address: string; phone: string; email: string;
@@ -90,6 +95,11 @@ const PharmacistDashboard = () => {
   const [selectedItem, setSelectedItem]   = useState<InventoryItem | null>(null);
   const [invForm, setInvForm]             = useState({ medicine_id: '', stock_level: '', price: '', pharmacy_id: '' });
   const [invProcessing, setInvProcessing] = useState(false);
+
+  // Inventory filters
+  const [invSearch, setInvSearch]           = useState('');
+  const [invStockFilter, setInvStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [invTypeFilter, setInvTypeFilter]   = useState('all');
 
   // Medicines lookup for inventory add
   const [medicines, setMedicines]         = useState<{ id: string; name: string; strength?: string; dosage_form?: string }[]>([]);
@@ -114,10 +124,17 @@ const PharmacistDashboard = () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       const email = authUser?.email;
       if (!email) {
-        // No session yet — wait for auth to restore, do not redirect
         setApprovalStatus('loading');
         return;
       }
+
+      // Fetch pharmacist's display name
+      const { data: profile } = await (supabase as any)
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', user.id)
+        .single();
+      setPharmacistName(profile?.full_name ?? null);
 
       // Run both queries in parallel
       const [appsRes, roleRes] = await Promise.all([
@@ -150,6 +167,7 @@ const PharmacistDashboard = () => {
           .eq('owner_id', user.id);
         const owned = (pharmacies ?? []).filter((p: any) => p.owner_id === user.id);
         setMyPharmacies(owned);
+        if (owned.length === 1) setSelectedPharmacyId(owned[0].id);
         return;
       }
 
@@ -166,6 +184,7 @@ const PharmacistDashboard = () => {
         // Hard client-side filter — only keep rows where owner_id exactly matches
         const owned = (pharmacies ?? []).filter((p: any) => p.owner_id === user.id);
         setMyPharmacies(owned);
+        if (owned.length === 1) setSelectedPharmacyId(owned[0].id);
       }
     };
     check();
@@ -300,7 +319,7 @@ const PharmacistDashboard = () => {
     // pharmacyIds is already scoped to owner_id = user.id from the access check
     const { data, error } = await (supabase as any)
       .from('reservations')
-      .select('id, pharmacy_id, medicine_id, quantity, status, requested_at')
+      .select('id, pharmacy_id, medicine_id, quantity, status, requested_at, reference')
       .in('pharmacy_id', pharmacyIds)  // pharmacyIds = only this user's pharmacies
       .order('requested_at', { ascending: false });
 
@@ -455,10 +474,10 @@ const PharmacistDashboard = () => {
   };
 
   const invCounts = {
-    total:     inventory.length,
-    inStock:   inventory.filter(i => i.stock_level > 10).length,
-    lowStock:  inventory.filter(i => i.stock_level > 0 && i.stock_level <= 10).length,
-    outOfStock: inventory.filter(i => i.stock_level === 0).length,
+    total:      inventory.filter(i => selectedPharmacyId === 'all' || i.pharmacy_id === selectedPharmacyId).length,
+    inStock:    inventory.filter(i => (selectedPharmacyId === 'all' || i.pharmacy_id === selectedPharmacyId) && i.stock_level > 10).length,
+    lowStock:   inventory.filter(i => (selectedPharmacyId === 'all' || i.pharmacy_id === selectedPharmacyId) && i.stock_level > 0 && i.stock_level <= 10).length,
+    outOfStock: inventory.filter(i => (selectedPharmacyId === 'all' || i.pharmacy_id === selectedPharmacyId) && i.stock_level === 0).length,
   };
 
   // Analytics: most booked medicines
@@ -474,6 +493,34 @@ const PharmacistDashboard = () => {
   const isApproved = approvalStatus === 'approved';
   const isPending  = approvalStatus === 'pending';
   const isRejected = approvalStatus === 'rejected';
+
+  // Inventory filter derived values
+  const branchInventory = selectedPharmacyId === 'all'
+    ? inventory
+    : inventory.filter(i => i.pharmacy_id === selectedPharmacyId);
+
+  const inventoryCategories = ['all', ...Array.from(new Set(branchInventory.map(i => i.medicine_category).filter(c => c && c !== '—')))];
+
+  const filteredInventory = branchInventory.filter(item => {
+    const stockLevel = item.stock_level;
+    const stockMatch =
+      invStockFilter === 'all'          ? true :
+      invStockFilter === 'out_of_stock' ? stockLevel === 0 :
+      invStockFilter === 'low_stock'    ? stockLevel > 0 && stockLevel <= 10 :
+      /* in_stock */                      stockLevel > 10;
+
+    const typeMatch = invTypeFilter === 'all' || item.medicine_category === invTypeFilter;
+
+    const q = invSearch.trim().toLowerCase();
+    const searchMatch = !q || [
+      item.medicine_name,
+      item.medicine_category,
+      item.medicine_dosage_form,
+      item.medicine_strength,
+    ].some(v => (v ?? '').toLowerCase().includes(q));
+
+    return stockMatch && typeMatch && searchMatch;
+  });
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (authLoading || (!user && approvalStatus === 'loading') || (user && approvalStatus === 'loading')) {
@@ -494,12 +541,16 @@ const PharmacistDashboard = () => {
       {/* ── Sidebar ── */}
       <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-card">
         <div className="flex items-center gap-2.5 px-4 py-5 border-b border-border">
-          <Building2 className="h-5 w-5 text-primary" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <span className="text-sm font-bold text-primary">
+              {(pharmacistName ?? user?.email ?? 'P')[0].toUpperCase()}
+            </span>
+          </div>
           <div className="min-w-0">
-            <p className="font-heading font-bold text-sm text-foreground truncate">
-              {application?.pharmacy_name ?? myPharmacies[0]?.name ?? 'My Pharmacy'}
+            <p className="font-heading font-bold text-base text-foreground truncate">
+              {pharmacistName ?? 'Pharmacist'}
             </p>
-            <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+            <p className="text-xs text-success font-medium">Pharmacist</p>
           </div>
         </div>
 
@@ -538,7 +589,7 @@ const PharmacistDashboard = () => {
         <div className="p-3 border-t border-border">
           <button
             onClick={() => { supabase.auth.signOut(); navigate('/auth'); }}
-            className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            className="w-full flex items-center gap-2 rounded-lg px-3 py-3 text-base font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             <LogOut className="h-4 w-4" /> Sign Out
           </button>
@@ -553,7 +604,7 @@ const PharmacistDashboard = () => {
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4">
             <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-warning">Application Under Review</p>
+              <p className="text-base font-semibold text-warning">Application Under Review</p>
               <p className="text-sm text-muted-foreground mt-0.5">
                 Submitted {application?.created_at ? new Date(application.created_at).toLocaleDateString() : '—'}.
                 Dashboard access is locked until your application is approved.
@@ -565,7 +616,7 @@ const PharmacistDashboard = () => {
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
             <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-destructive">Application Not Approved</p>
+              <p className="text-base font-semibold text-destructive">Application Not Approved</p>
               <p className="text-sm text-muted-foreground mt-0.5">Contact support or submit a new application.</p>
             </div>
             <Button size="sm" variant="outline" onClick={() => navigate('/pharmacy-signup')}>
@@ -612,8 +663,8 @@ const PharmacistDashboard = () => {
                       <Card key={s.label} className="cursor-pointer hover:shadow-md transition-shadow"
                         onClick={() => { setActiveTab('reservations'); setResFilter(s.label.toLowerCase()); }}>
                         <CardContent className="pt-5">
-                          <p className="text-xs text-muted-foreground">{s.label}</p>
-                          <p className={`text-2xl font-bold mt-0.5 ${s.color}`}>{s.value}</p>
+                          <p className="text-sm text-muted-foreground">{s.label}</p>
+                          <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.value}</p>
                         </CardContent>
                       </Card>
                     ))}
@@ -633,8 +684,8 @@ const PharmacistDashboard = () => {
                       <Card key={s.label} className="cursor-pointer hover:shadow-md transition-shadow"
                         onClick={() => setActiveTab('inventory')}>
                         <CardContent className="pt-5">
-                          <p className="text-xs text-muted-foreground">{s.label}</p>
-                          <p className={`text-2xl font-bold mt-0.5 ${s.color}`}>{s.value}</p>
+                          <p className="text-sm text-muted-foreground">{s.label}</p>
+                          <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.value}</p>
                         </CardContent>
                       </Card>
                     ))}
@@ -864,10 +915,15 @@ const PharmacistDashboard = () => {
             {/* ══════════════ INVENTORY ══════════════ */}
             {activeTab === 'inventory' && (
               <div className="space-y-5 w-full">
+                {/* Header */}
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <div>
                     <h1 className="font-heading text-3xl font-bold text-foreground">Inventory</h1>
-                    <p className="text-base text-muted-foreground mt-1">Manage stock levels and pricing</p>
+                    <p className="text-base text-muted-foreground mt-1">
+                      {selectedPharmacyId === 'all'
+                        ? 'Managing stock across all branches'
+                        : `Managing stock for ${myPharmacies.find(p => p.id === selectedPharmacyId)?.name ?? 'selected branch'}`}
+                    </p>
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" onClick={fetchInventory} disabled={invLoading}>
@@ -875,7 +931,12 @@ const PharmacistDashboard = () => {
                       Refresh
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => {
-                      setInvForm({ medicine_id: '', stock_level: '', price: '', pharmacy_id: myPharmacies[0]?.id ?? '' });
+                      setInvForm({
+                        medicine_id: '',
+                        stock_level: '',
+                        price: '',
+                        pharmacy_id: selectedPharmacyId !== 'all' ? selectedPharmacyId : myPharmacies[0]?.id ?? '',
+                      });
                       setMedSearch('');
                       setMedicines([]);
                       setInvDialog('add');
@@ -883,7 +944,12 @@ const PharmacistDashboard = () => {
                       <Upload className="h-4 w-4 mr-1" /> Upload CSV
                     </Button>
                     <Button size="sm" onClick={() => {
-                      setInvForm({ medicine_id: '', stock_level: '', price: '', pharmacy_id: myPharmacies[0]?.id ?? '' });
+                      setInvForm({
+                        medicine_id: '',
+                        stock_level: '',
+                        price: '',
+                        pharmacy_id: selectedPharmacyId !== 'all' ? selectedPharmacyId : myPharmacies[0]?.id ?? '',
+                      });
                       setMedSearch('');
                       setMedicines([]);
                       setInvDialog('add');
@@ -893,64 +959,211 @@ const PharmacistDashboard = () => {
                   </div>
                 </div>
 
+                {/* ── Branch selector ── */}
+                {myPharmacies.length > 0 && (
+                  <div className="flex gap-2 flex-wrap">
+                    {myPharmacies.length > 1 && (
+                      <button
+                        onClick={() => { setSelectedPharmacyId('all'); setInvStockFilter('all'); setInvTypeFilter('all'); setInvSearch(''); }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 ${
+                          selectedPharmacyId === 'all'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                            : 'border-border bg-card text-foreground/70 hover:text-foreground hover:border-primary/40'
+                        }`}
+                      >
+                        All Branches
+                        <span className="ml-1.5 font-bold opacity-80">{inventory.length}</span>
+                      </button>
+                    )}
+                    {myPharmacies.map(p => {
+                      const count = inventory.filter(i => i.pharmacy_id === p.id).length;
+                      const outOfStock = inventory.filter(i => i.pharmacy_id === p.id && i.stock_level === 0).length;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => { setSelectedPharmacyId(p.id); setInvStockFilter('all'); setInvTypeFilter('all'); setInvSearch(''); }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 flex items-center gap-1.5 ${
+                            selectedPharmacyId === p.id
+                              ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                              : 'border-border bg-card text-foreground/70 hover:text-foreground hover:border-primary/40'
+                          }`}
+                        >
+                          <Store className="h-3 w-3" />
+                          {p.name}
+                          <span className="font-bold opacity-80">{count}</span>
+                          {outOfStock > 0 && (
+                            <span className={`rounded-full px-1.5 py-0 text-[10px] font-bold ${
+                              selectedPharmacyId === p.id ? 'bg-white/25 text-white' : 'bg-destructive/15 text-destructive'
+                            }`}>
+                              {outOfStock} out
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ── Search + Filter bar ── */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search input */}
+                  <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Search by name, category, form…"
+                      value={invSearch}
+                      onChange={e => setInvSearch(e.target.value)}
+                      className="pl-9 font-medium placeholder:text-muted-foreground/60"
+                    />
+                  </div>
+
+                  {/* Stock status pills */}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {([
+                      { key: 'all',          label: 'All Stock',    count: invCounts.total                                  },
+                      { key: 'in_stock',     label: 'In Stock',     count: invCounts.inStock,    color: 'text-success'     },
+                      { key: 'low_stock',    label: 'Low Stock',    count: invCounts.lowStock,   color: 'text-warning'     },
+                      { key: 'out_of_stock', label: 'Out of Stock', count: invCounts.outOfStock, color: 'text-destructive' },
+                    ] as { key: typeof invStockFilter; label: string; count: number; color?: string }[]).map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setInvStockFilter(f.key)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 ${
+                          invStockFilter === f.key
+                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                            : 'border-border bg-card text-foreground/70 hover:text-foreground hover:border-primary/40'
+                        }`}
+                      >
+                        {f.label}
+                        <span className={`ml-1.5 font-bold text-[11px] ${invStockFilter === f.key ? 'opacity-80' : (f.color ?? 'text-muted-foreground')}`}>
+                          {f.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Category / type dropdown */}
+                  <Select value={invTypeFilter} onValueChange={setInvTypeFilter}>
+                    <SelectTrigger className="w-[160px] text-sm font-medium">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {inventoryCategories.map(cat => (
+                        <SelectItem key={cat} value={cat} className="text-sm font-medium">
+                          {cat === 'all' ? 'All Categories' : cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Active filter count + clear */}
+                  {(invSearch || invStockFilter !== 'all' || invTypeFilter !== 'all') && (
+                    <button
+                      onClick={() => { setInvSearch(''); setInvStockFilter('all'); setInvTypeFilter('all'); }}
+                      className="text-xs font-semibold text-muted-foreground hover:text-destructive transition-colors underline underline-offset-2"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+
+                {/* Results summary */}
+                {(invSearch || invStockFilter !== 'all' || invTypeFilter !== 'all' || selectedPharmacyId !== 'all') && (
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Showing <span className="font-bold text-foreground">{filteredInventory.length}</span> of{' '}
+                    <span className="font-bold text-foreground">{inventory.length}</span> items
+                    {selectedPharmacyId !== 'all' && (
+                      <span className="ml-1">
+                        at <span className="font-bold text-foreground">{myPharmacies.find(p => p.id === selectedPharmacyId)?.name}</span>
+                      </span>
+                    )}
+                  </p>
+                )}
+
                 {invLoading ? (
                   <p className="text-center py-12 text-muted-foreground">Loading…</p>
                 ) : inventory.length === 0 ? (
                   <p className="text-center py-12 text-muted-foreground">No inventory items found.</p>
+                ) : filteredInventory.length === 0 ? (
+                  <div className="text-center py-16">
+                    <SearchIcon className="mx-auto h-8 w-8 text-muted-foreground/30 mb-3" />
+                    <p className="text-base font-semibold text-foreground">No items match your filters</p>
+                    <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or filter criteria.</p>
+                    <button
+                      onClick={() => { setInvSearch(''); setInvStockFilter('all'); setInvTypeFilter('all'); }}
+                      className="mt-3 text-sm font-semibold text-primary hover:underline"
+                    >
+                      Clear all filters
+                    </button>
+                  </div>
                 ) : (
-                  <Card>
+                  <Card className="overflow-hidden border-border shadow-card">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-sm font-semibold">Medicine</TableHead>
-                          <TableHead className="text-sm font-semibold">Category</TableHead>
-                          <TableHead className="text-sm font-semibold">Form / Strength</TableHead>
-                          <TableHead className="text-sm font-semibold">Stock</TableHead>
-                          <TableHead className="text-sm font-semibold">Price (P)</TableHead>
-                          <TableHead className="text-sm font-semibold">Last Updated</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                        <TableRow className="bg-primary hover:bg-primary">
+                          <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Medicine</TableHead>
+                          {selectedPharmacyId === 'all' && (
+                            <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Branch</TableHead>
+                          )}
+                          <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Category</TableHead>
+                          <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Form / Strength</TableHead>
+                          <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Stock</TableHead>
+                          <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Price (P)</TableHead>
+                          <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Last Updated</TableHead>
+                          <TableHead className="text-right text-xs font-bold uppercase tracking-wider text-primary-foreground">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {inventory.map(item => {
+                        {filteredInventory.map(item => {
                           const stockStatus = item.stock_level === 0
-                            ? { label: 'Out', className: 'bg-destructive/10 text-destructive border-destructive/20' }
+                            ? { label: 'Out of Stock', className: 'bg-destructive/15 text-destructive border-destructive/30' }
                             : item.stock_level <= 10
-                            ? { label: 'Low', className: 'bg-warning/10 text-warning border-warning/20' }
-                            : { label: 'OK',  className: 'bg-success/10 text-success border-success/20' };
+                            ? { label: 'Low Stock',    className: 'bg-warning/15 text-warning border-warning/30'             }
+                            : { label: 'In Stock',     className: 'bg-success/15 text-success border-success/30'             };
+                          const branchName = myPharmacies.find(p => p.id === item.pharmacy_id)?.name ?? '—';
                           return (
-                            <TableRow key={item.id}>
-                              <TableCell className="font-medium text-sm">{item.medicine_name}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{item.medicine_category}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
+                            <TableRow key={item.id} className="hover:bg-secondary/30 transition-colors">
+                              <TableCell className="font-bold text-sm text-foreground">{item.medicine_name}</TableCell>
+                              {selectedPharmacyId === 'all' && (
+                                <TableCell>
+                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                    <Store className="h-3 w-3" />{branchName}
+                                  </span>
+                                </TableCell>
+                              )}
+                              <TableCell className="text-sm font-medium text-foreground/75">{item.medicine_category}</TableCell>
+                              <TableCell className="text-sm font-medium text-muted-foreground">
                                 {item.medicine_dosage_form}{item.medicine_strength ? ` · ${item.medicine_strength}` : ''}
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-semibold">{item.stock_level}</span>
-                                  <Badge variant="outline" className={stockStatus.className + ' text-[10px] px-1.5 py-0'}>
+                                  <span className="font-bold text-foreground">{item.stock_level}</span>
+                                  <Badge variant="outline" className={`${stockStatus.className} text-[10px] px-1.5 py-0 font-semibold`}>
                                     {stockStatus.label}
                                   </Badge>
                                 </div>
                               </TableCell>
-                              <TableCell className="font-medium text-sm">{Number(item.price).toFixed(2)}</TableCell>
-                              <TableCell className="text-xs text-muted-foreground">
+                              <TableCell className="font-semibold text-sm text-foreground">P {Number(item.price).toFixed(2)}</TableCell>
+                              <TableCell className="text-xs font-medium text-muted-foreground">
                                 {new Date(item.last_updated).toLocaleDateString()}
                               </TableCell>
                               <TableCell className="text-right space-x-1">
-                                <Button size="sm" variant="ghost" onClick={() => {
-                                  setSelectedItem(item);
-                                  setInvForm({
-                                    medicine_id:  item.medicine_id,
-                                    stock_level:  String(item.stock_level),
-                                    price:        String(item.price),
-                                    pharmacy_id:  item.pharmacy_id,
-                                  });
-                                  setInvDialog('edit');
-                                }}>
+                                <Button size="sm" variant="ghost"
+                                  className="text-xs font-semibold hover:text-primary"
+                                  onClick={() => {
+                                    setSelectedItem(item);
+                                    setInvForm({
+                                      medicine_id: item.medicine_id,
+                                      stock_level: String(item.stock_level),
+                                      price:       String(item.price),
+                                      pharmacy_id: item.pharmacy_id,
+                                    });
+                                    setInvDialog('edit');
+                                  }}>
                                   <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                                <Button size="sm" variant="ghost"
+                                  className="text-xs font-semibold text-destructive hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => { setSelectedItem(item); setInvDialog('delete'); }}>
                                   <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                                 </Button>
