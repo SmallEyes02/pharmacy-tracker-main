@@ -80,7 +80,7 @@ const PharmacySignupPage = () => {
     // They sign up now with their email + password.
     // They can log in immediately but are restricted until approved.
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email:    result.data.pharmacist_email,
+      email:    result.data.pharmacist_email.toLowerCase(),
       password: result.data.pharmacist_password,
       options: {
         data: {
@@ -111,7 +111,7 @@ const PharmacySignupPage = () => {
         license_expiry_date: result.data.license_expiry_date,
         issuing_authority:   result.data.issuing_authority,
         pharmacist_name:     result.data.pharmacist_name,
-        pharmacist_email:    result.data.pharmacist_email,
+        pharmacist_email:    result.data.pharmacist_email.toLowerCase(),
         pharmacist_phone:    result.data.pharmacist_phone,
         opening_time:        result.data.opening_time,
         closing_time:        result.data.closing_time,
