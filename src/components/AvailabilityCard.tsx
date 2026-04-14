@@ -12,6 +12,7 @@ import { useState } from 'react';
 import {
   MapPin, Clock, Navigation, ShoppingBag,
   Building2, Pill, CalendarClock, CheckCircle,
+  MessageCircle, ShieldCheck,
   AlertTriangle, ArrowRight,
 } from 'lucide-react';
 
@@ -34,6 +35,19 @@ const getPickupWindow = () => {
   });
 };
 
+// Converts a last_updated ISO string into "X minutes/hours/days ago"
+const getStockAge = (lastUpdated: string | null | undefined): string | null => {
+  if (!lastUpdated) return null;
+  const diffMs = Date.now() - new Date(lastUpdated).getTime();
+  const mins   = Math.floor(diffMs / 60_000);
+  const hours  = Math.floor(diffMs / 3_600_000);
+  const days   = Math.floor(diffMs / 86_400_000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+  if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+  return `${days} day${days !== 1 ? 's' : ''} ago`;
+};
+
 const AvailabilityCard = ({ item }: AvailabilityCardProps) => {
   const { user }   = useAuth();
   const navigate   = useNavigate();
@@ -50,6 +64,8 @@ const AvailabilityCard = ({ item }: AvailabilityCardProps) => {
   const isOutOfStock = item.status === 'out_of_stock';
   const hasCoords    = pharmacy.latitude != null && pharmacy.longitude != null;
   const hasDistance  = pharmacy.distance && pharmacy.distance !== '—';
+  const stockAge     = getStockAge(item.lastUpdated);
+  const whatsappNum  = pharmacy.whatsapp?.replace(/[^0-9+]/g, '');
   const maxQty       = Math.min(item.quantity, 10);
   const totalPrice   = (Number(item.price) * qty).toFixed(2);
 
@@ -146,6 +162,12 @@ const AvailabilityCard = ({ item }: AvailabilityCardProps) => {
             <p className="mt-0.5 truncate text-xs text-muted-foreground/70">
               <MapPin className="mr-0.5 inline h-3 w-3" />{pharmacy.address}
             </p>
+            {stockAge && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground/80">
+                <ShieldCheck className="h-3 w-3 text-success shrink-0" />
+                Stock last verified <span className="font-semibold text-foreground ml-0.5">{stockAge}</span>
+              </p>
+            )}
           </div>
           <div className="ml-3 shrink-0 text-right">
             <p className="font-heading text-lg font-bold text-foreground">
@@ -156,13 +178,29 @@ const AvailabilityCard = ({ item }: AvailabilityCardProps) => {
         </div>
 
         {/* Actions */}
-        <div className="mt-3 flex gap-2">
-          <Button size="sm" variant="outline" className="flex-1 gap-1" onClick={handleViewOnMap}>
+        <div className="mt-3 flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" className="flex-1 gap-1 min-w-[80px]" onClick={handleViewOnMap}>
             <MapPin className="h-3.5 w-3.5" />
-            {hasCoords ? 'View on Map' : 'Open in Maps'}
+            {hasCoords ? 'Map' : 'Maps'}
           </Button>
+          {whatsappNum && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 px-3 border-green-600/40 text-green-700 hover:bg-green-50 hover:border-green-600"
+              onClick={() => window.open(
+                `https://wa.me/${whatsappNum}?text=${encodeURIComponent(
+                  `Hi, I'm enquiring about ${variant.brandName}${variant.strength ? ' ' + variant.strength : ''} at ${pharmacy.name}`
+                )}`,
+                '_blank'
+              )}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              WhatsApp
+            </Button>
+          )}
           {!isOutOfStock && (
-            <Button size="sm" className="flex-1 gap-1" onClick={handleReserveClick}>
+            <Button size="sm" className="flex-1 gap-1 min-w-[80px]" onClick={handleReserveClick}>
               <ShoppingBag className="h-3.5 w-3.5" /> Reserve
             </Button>
           )}

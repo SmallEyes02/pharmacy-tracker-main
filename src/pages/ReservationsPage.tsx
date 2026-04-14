@@ -50,10 +50,8 @@ const formatExpiry = (expiryAt: string | null, status: string): { text: string; 
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
   if (hours < 1)  return { text: `Expires in ${minutes}m`, urgent: true };
-  if (hours < 6)  return { text: `Expires in ${hours}h ${minutes}m`, urgent: true };
-  if (hours < 24) return { text: `Expires in ${hours}h`, urgent: false };
-  const days = Math.floor(hours / 24);
-  return { text: `Expires in ${days}d`, urgent: false };
+  if (hours < 2)  return { text: `Expires in ${hours}h ${minutes}m`, urgent: true };
+  return { text: `Expires in ${hours}h`, urgent: false };
 };
 
 const ReservationsPage = () => {
@@ -130,7 +128,7 @@ const ReservationsPage = () => {
         <h1 className="font-heading text-3xl font-bold text-foreground">My Reservations</h1>
         <p className="mt-2 text-muted-foreground">Track and manage your medicine reservations in Gaborone</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Reservations are held for <strong>24 hours</strong> and automatically expire if not collected.
+          Reservations are held for <strong>2 hours</strong> and automatically expire if not collected.
         </p>
 
         {reservations.length === 0 ? (

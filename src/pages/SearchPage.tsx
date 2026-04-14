@@ -26,7 +26,9 @@ interface RawResult {
     closing_time: string | null;
     is_active: boolean;
     location: { coordinates: [number, number] } | null;
+    whatsapp: string | null;
   };
+  last_updated: string | null;
   medicines: {
     id: string;
     name: string;
@@ -119,7 +121,9 @@ const enrichWithDistance = (
       longitude:           coords?.lng ?? null,
       distance,
       travelTime,
+      whatsapp:            raw.pharmacies.whatsapp ?? null,
     },
+    lastUpdated: raw.last_updated ?? null,
     medicineVariant: {
       id:          raw.medicines.id,
       brandName:   raw.medicines.name,
@@ -170,9 +174,9 @@ const SearchPage = () => {
         const { data, error } = await (supabase
           .from('pharmacy_inventory' as any)
           .select(`
-            id, price, stock_level,
+            id, price, stock_level, last_updated,
             pharmacies:pharmacy_id (
-              id, name, address, phone, email,
+              id, name, address, phone, email, whatsapp,
               accepts_medical_aid, opening_time, closing_time,
               is_active, location
             ),

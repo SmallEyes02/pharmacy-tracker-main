@@ -29,12 +29,15 @@ interface Reservation {
   id: string;
   pharmacy_id: string;
   medicine_id: string;
+  user_id: string;
   quantity: number;
   status: string;
   requested_at: string;
+  expiry_at?: string | null;
   reference?: string | null;
   medicine_name?: string;
   pharmacy_name?: string;
+  patient_name?: string;
 }
 
 interface InventoryItem {
@@ -64,7 +67,8 @@ const statusConfig: Record<string, { label: string; icon: React.ElementType; cla
   confirmed: { label: 'Confirmed', icon: CheckCircle,  className: 'bg-success/10 text-success border-success/20'             },
   ready:     { label: 'Ready',     icon: Package,      className: 'bg-blue-500/10 text-blue-600 border-blue-500/20'          },
   expired:   { label: 'Expired',   icon: XCircle,      className: 'bg-muted text-muted-foreground border-border'             },
-  cancelled: { label: 'Cancelled', icon: XCircle,      className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  cancelled:  { label: 'Cancelled',  icon: XCircle,      className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  fulfilled:  { label: 'Fulfilled',  icon: CheckCircle,  className: 'bg-primary/10 text-primary border-primary/20'              },
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -319,8 +323,8 @@ const PharmacistDashboard = () => {
     // pharmacyIds is already scoped to owner_id = user.id from the access check
     const { data, error } = await (supabase as any)
       .from('reservations')
-      .select('id, pharmacy_id, medicine_id, quantity, status, requested_at, reference')
-      .in('pharmacy_id', pharmacyIds)  // pharmacyIds = only this user's pharmacies
+      .select('id, pharmacy_id, medicine_id, user_id, quantity, status, requested_at, expiry_at, reference')
+      .in('pharmacy_id', pharmacyIds)
       .order('requested_at', { ascending: false });
 
     if (error) {
@@ -330,29 +334,36 @@ const PharmacistDashboard = () => {
       return;
     }
 
-    // Enrich with medicine names
-    const medicineIds = [...new Set((data ?? []).map((r: any) => r.medicine_id).filter(Boolean))];
+    // Enrich with medicine, pharmacy, and patient names in parallel
+    const medicineIds     = [...new Set((data ?? []).map((r: any) => r.medicine_id).filter(Boolean))];
     const pharmacyIdsUniq = [...new Set((data ?? []).map((r: any) => r.pharmacy_id).filter(Boolean))];
+    const userIds         = [...new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean))];
 
-    const [medRes, pharRes] = await Promise.all([
+    const [medRes, pharRes, profileRes] = await Promise.all([
       medicineIds.length
         ? (supabase as any).from('medicines').select('id, name').in('id', medicineIds)
         : { data: [] },
       pharmacyIdsUniq.length
         ? (supabase as any).from('pharmacies').select('id, name').in('id', pharmacyIdsUniq)
         : { data: [] },
+      userIds.length
+        ? (supabase as any).from('profiles').select('user_id, full_name').in('user_id', userIds)
+        : { data: [] },
     ]);
 
-    const medMap: Record<string, string> = {};
-    (medRes.data ?? []).forEach((m: any) => { medMap[m.id] = m.name; });
+    const medMap:     Record<string, string> = {};
+    const pharMap:    Record<string, string> = {};
+    const profileMap: Record<string, string> = {};
 
-    const pharMap: Record<string, string> = {};
-    (pharRes.data ?? []).forEach((p: any) => { pharMap[p.id] = p.name; });
+    (medRes.data     ?? []).forEach((m: any) => { medMap[m.id]          = m.name; });
+    (pharRes.data    ?? []).forEach((p: any) => { pharMap[p.id]         = p.name; });
+    (profileRes.data ?? []).forEach((p: any) => { profileMap[p.user_id] = p.full_name ?? 'Patient'; });
 
     setReservations((data ?? []).map((r: any) => ({
       ...r,
-      medicine_name: medMap[r.medicine_id] ?? '—',
+      medicine_name: medMap[r.medicine_id]  ?? '—',
       pharmacy_name: pharMap[r.pharmacy_id] ?? '—',
+      patient_name:  profileMap[r.user_id]  ?? 'Patient',
     })));
     setResLoading(false);
   }, [myPharmacies]);
@@ -465,11 +476,12 @@ const PharmacistDashboard = () => {
   const filteredRes = resFilter === 'all'
     ? reservations : reservations.filter(r => r.status === resFilter);
 
-  const resCounts = {
+  const resCounts: Record<string, number> = {
     all:       reservations.length,
     pending:   reservations.filter(r => r.status === 'pending').length,
     confirmed: reservations.filter(r => r.status === 'confirmed').length,
     ready:     reservations.filter(r => r.status === 'ready').length,
+    fulfilled: reservations.filter(r => r.status === 'fulfilled').length,
     cancelled: reservations.filter(r => r.status === 'cancelled').length,
   };
 
@@ -826,10 +838,11 @@ const PharmacistDashboard = () => {
             {/* ══════════════ RESERVATIONS ══════════════ */}
             {activeTab === 'reservations' && (
               <div className="space-y-5 w-full">
+                {/* Header */}
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="font-heading text-3xl font-bold text-foreground">Reservations</h1>
-                    <p className="text-base text-muted-foreground mt-1">Manage incoming medicine reservations</p>
+                    <p className="text-base text-muted-foreground mt-1">Manage incoming medicine reservations from patients</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={fetchReservations} disabled={resLoading}>
                     <RefreshCw className={`h-4 w-4 mr-1 ${resLoading ? 'animate-spin' : ''}`} />
@@ -837,77 +850,160 @@ const PharmacistDashboard = () => {
                   </Button>
                 </div>
 
+                {/* Workflow guide */}
+                <div className="flex items-center gap-3 text-sm text-muted-foreground bg-muted/40 rounded-lg px-4 py-3 flex-wrap">
+                  <span className="font-semibold text-foreground">Workflow:</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning inline-block" />Pending</span>
+                  <span className="opacity-40">→</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success inline-block" />Confirmed (set aside medicine)</span>
+                  <span className="opacity-40">→</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />Ready for Pickup</span>
+                  <span className="opacity-40">→</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary inline-block" />Fulfilled</span>
+                </div>
+
                 {/* Filter tabs */}
                 <div className="flex gap-2 flex-wrap">
-                  {(['all','pending','confirmed','ready','cancelled'] as const).map(f => (
+                  {(['all','pending','confirmed','ready','fulfilled','cancelled'] as const).map(f => (
                     <button key={f} onClick={() => setResFilter(f)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
-                        ${resFilter === f ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors
+                        ${resFilter === f
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'border-border text-muted-foreground hover:border-primary/40'}`}>
                       {f.charAt(0).toUpperCase() + f.slice(1)}
-                      <span className="ml-1.5 opacity-70">{resCounts[f]}</span>
+                      {(resCounts[f] ?? 0) > 0 && (
+                        <span className={`ml-1.5 text-xs font-bold ${resFilter === f ? 'opacity-80' : 'text-primary'}`}>
+                          {resCounts[f]}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
 
+                {/* Content */}
                 {resLoading ? (
-                  <p className="text-center py-12 text-muted-foreground">Loading…</p>
+                  <div className="flex items-center justify-center py-16">
+                    <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground mr-2" />
+                    <span className="text-muted-foreground">Loading reservations…</span>
+                  </div>
                 ) : filteredRes.length === 0 ? (
-                  <p className="text-center py-12 text-muted-foreground">No reservations found.</p>
+                  <div className="flex flex-col items-center py-16 text-center">
+                    <ClipboardList className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                    <p className="font-medium text-muted-foreground">No {resFilter !== 'all' ? resFilter : ''} reservations</p>
+                  </div>
                 ) : (
-                  <Card>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-sm font-semibold">Medicine</TableHead>
-                          <TableHead className="text-sm font-semibold">Pharmacy</TableHead>
-                          <TableHead className="text-sm font-semibold">Qty</TableHead>
-                          <TableHead className="text-sm font-semibold">Status</TableHead>
-                          <TableHead className="text-sm font-semibold">Requested</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredRes.map(res => {
-                          const cfg = statusConfig[res.status] ?? statusConfig.pending;
-                          const StatusIcon = cfg.icon;
-                          return (
-                            <TableRow key={res.id}>
-                              <TableCell className="font-medium text-sm">{res.medicine_name}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{res.pharmacy_name}</TableCell>
-                              <TableCell>{res.quantity}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={cfg.className}>
-                                  <StatusIcon className="mr-1 h-3 w-3" />
-                                  {cfg.label}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground">
-                                {new Date(res.requested_at).toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-right space-x-1">
-                                {res.status === 'pending' && (
-                                  <Button size="sm" onClick={() => updateReservation(res.id, 'confirmed')}>
-                                    Confirm
-                                  </Button>
-                                )}
-                                {res.status === 'confirmed' && (
-                                  <Button size="sm" variant="secondary" onClick={() => updateReservation(res.id, 'ready')}>
-                                    Mark Ready
-                                  </Button>
-                                )}
-                                {(res.status === 'pending' || res.status === 'confirmed') && (
-                                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                                    onClick={() => updateReservation(res.id, 'cancelled')}>
-                                    Cancel
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </Card>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {filteredRes.map(res => {
+                      const cfg        = statusConfig[res.status] ?? statusConfig.pending;
+                      const StatusIcon = cfg.icon;
+
+                      // Expiry countdown
+                      const expiryText = (() => {
+                        if (!res.expiry_at || !['pending','confirmed'].includes(res.status)) return null;
+                        const diff = new Date(res.expiry_at as string).getTime() - Date.now();
+                        if (diff <= 0) return { text: 'Expired', urgent: true };
+                        const hrs = Math.floor(diff / 3_600_000);
+                        const min = Math.floor((diff % 3_600_000) / 60_000);
+                        return hrs < 1
+                          ? { text: `${min}m left`, urgent: true }
+                          : { text: `${hrs}h ${min}m left`, urgent: hrs < 1 };
+                      })();
+
+                      return (
+                        <div key={res.id}
+                          className={`rounded-xl border bg-card p-4 shadow-sm flex flex-col gap-3 transition-all hover:shadow-md
+                            ${res.status === 'pending'   ? 'border-warning/50' :
+                              res.status === 'confirmed' ? 'border-success/50' :
+                              res.status === 'ready'     ? 'border-blue-500/50' :
+                              res.status === 'fulfilled' ? 'border-primary/30 opacity-70' :
+                              'border-border opacity-60'}`}>
+
+                          {/* Reference + Status */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-sm font-bold text-primary tracking-widest bg-primary/10 px-2.5 py-1 rounded-lg">
+                              {res.reference ?? '—'}
+                            </span>
+                            <Badge variant="outline" className={cfg.className}>
+                              <StatusIcon className="mr-1 h-3 w-3" />
+                              {cfg.label}
+                            </Badge>
+                          </div>
+
+                          {/* Patient */}
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+                              {(res.patient_name ?? 'P')[0].toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-foreground truncate">
+                                {res.patient_name ?? 'Patient'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(res.requested_at).toLocaleString('en-BW', {
+                                  month: 'short', day: 'numeric',
+                                  hour: '2-digit', minute: '2-digit',
+                                })}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Medicine + Qty */}
+                          <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+                            <p className="font-semibold text-sm text-foreground">{res.medicine_name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Qty: <span className="font-bold text-foreground">{res.quantity}</span>
+                              {myPharmacies.length > 1 && <> · {res.pharmacy_name}</>}
+                            </p>
+                          </div>
+
+                          {/* Expiry warning */}
+                          {expiryText && (
+                            <p className={`text-xs flex items-center gap-1 ${expiryText.urgent ? 'text-destructive' : 'text-warning'}`}>
+                              <Clock className="h-3 w-3" /> {expiryText.text}
+                            </p>
+                          )}
+
+                          {/* Action buttons */}
+                          <div className="flex flex-col gap-2 mt-auto pt-1">
+                            {res.status === 'pending' && (<>
+                              <Button size="sm" className="w-full gap-1.5"
+                                onClick={() => updateReservation(res.id, 'confirmed')}>
+                                <CheckCircle className="h-4 w-4" /> Confirm — Set Aside Medicine
+                              </Button>
+                              <Button size="sm" variant="ghost"
+                                className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => updateReservation(res.id, 'cancelled')}>
+                                <XCircle className="h-4 w-4 mr-1" /> Cancel Reservation
+                              </Button>
+                            </>)}
+                            {res.status === 'confirmed' && (<>
+                              <Button size="sm" variant="secondary" className="w-full gap-1.5"
+                                onClick={() => updateReservation(res.id, 'ready')}>
+                                <Package className="h-4 w-4" /> Mark Ready for Pickup
+                              </Button>
+                              <Button size="sm" variant="ghost"
+                                className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => updateReservation(res.id, 'cancelled')}>
+                                <XCircle className="h-4 w-4 mr-1" /> Cancel
+                              </Button>
+                            </>)}
+                            {res.status === 'ready' && (
+                              <Button size="sm" className="w-full gap-1.5 bg-primary hover:bg-primary/90"
+                                onClick={() => updateReservation(res.id, 'fulfilled')}>
+                                <CheckCircle className="h-4 w-4" /> Fulfilled — Patient Collected
+                              </Button>
+                            )}
+                            {['fulfilled','cancelled','expired'].includes(res.status) && (
+                              <p className="text-center text-xs text-muted-foreground py-1">
+                                {res.status === 'fulfilled' ? '✓ Transaction closed' :
+                                 res.status === 'cancelled' ? 'Reservation cancelled' : 'Reservation expired'}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}
