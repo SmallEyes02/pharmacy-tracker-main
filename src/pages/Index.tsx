@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapPin, Pill, Clock, Shield, ArrowRight, Search, Loader2, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import MedicineSearchBar from '@/components/MedicineSearchBar';
 import Header from '@/components/Header';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,6 +80,8 @@ const popularMeds = ['Panadol', 'Amoxicillin', 'Omeprazole', 'Ibuprofen'];
 
 // ── Pharmacy card ─────────────────────────────────────────────────────────────
 const NearbyCard = ({ pharmacy }: { pharmacy: NearbyPharmacy }) => {
+  const navigate = useNavigate();
+
   const isOpen = (() => {
     if (!pharmacy.opening_time || !pharmacy.closing_time) return null;
     const now   = new Date();
@@ -89,18 +91,18 @@ const NearbyCard = ({ pharmacy }: { pharmacy: NearbyPharmacy }) => {
     return mins >= oh * 60 + om && mins < ch * 60 + cm;
   })();
 
+  const mapUrl = pharmacy.latitude != null
+    ? `/map?lat=${pharmacy.latitude}&lng=${pharmacy.longitude}&id=${pharmacy.id}&name=${encodeURIComponent(pharmacy.name)}`
+    : '/map';
+
+  const inventoryUrl = `/search?pharmacy_id=${pharmacy.id}&pharmacy_name=${encodeURIComponent(pharmacy.name)}`;
+
   return (
-    <Link
-      to={
-        pharmacy.latitude != null
-          ? `/map?lat=${pharmacy.latitude}&lng=${pharmacy.longitude}&id=${pharmacy.id}&name=${encodeURIComponent(pharmacy.name)}`
-          : '/map'
-      }
-      className="group block rounded-xl border border-border bg-card p-5 shadow-card transition-all duration-300 hover:shadow-elevated hover:-translate-y-1"
-    >
+    <div className="rounded-xl border border-border bg-card p-5 shadow-card transition-all duration-300 hover:shadow-elevated hover:-translate-y-1">
+      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-heading font-semibold text-card-foreground truncate group-hover:text-primary transition-colors">
+          <p className="font-heading font-semibold text-card-foreground truncate">
             {pharmacy.name}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground truncate">{pharmacy.address}</p>
@@ -119,6 +121,7 @@ const NearbyCard = ({ pharmacy }: { pharmacy: NearbyPharmacy }) => {
         )}
       </div>
 
+      {/* Distance + medical aid */}
       <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-3">
           {pharmacy.distance !== '—' && (
@@ -146,7 +149,29 @@ const NearbyCard = ({ pharmacy }: { pharmacy: NearbyPharmacy }) => {
           {pharmacy.opening_time.slice(0, 5)} – {pharmacy.closing_time.slice(0, 5)}
         </p>
       )}
-    </Link>
+
+      {/* Action buttons */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 text-xs"
+          onClick={() => navigate(inventoryUrl)}
+        >
+          <Search className="h-3.5 w-3.5" />
+          View Stock
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 text-xs"
+          onClick={() => navigate(mapUrl)}
+        >
+          <MapPin className="h-3.5 w-3.5" />
+          View on Map
+        </Button>
+      </div>
+    </div>
   );
 };
 
