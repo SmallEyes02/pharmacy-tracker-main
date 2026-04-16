@@ -731,107 +731,135 @@ const PharmacistDashboard = () => {
             )}
 
             {/* ══════════════ MY PHARMACIES ══════════════ */}
-            {activeTab === 'pharmacies' && (
-              <div className="space-y-5 w-full">
-                <div>
-                  <h1 className="font-heading text-3xl font-bold text-foreground">My Pharmacies</h1>
-                  <p className="text-base text-muted-foreground mt-1">
-                    View and manage your approved pharmacies
-                  </p>
-                </div>
+{activeTab === 'pharmacies' && (
+  <div className="space-y-5 w-full">
+    <div>
+      <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">My Pharmacies</h1>
+      <p className="text-sm sm:text-base text-muted-foreground mt-1">
+        View and manage your approved pharmacies
+      </p>
+    </div>
 
-                {myPharmacies.length === 0 ? (
-                  <p className="text-center py-12 text-muted-foreground">No pharmacies found.</p>
-                ) : (
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-                    {myPharmacies.map((p) => (
-                      <Card key={p.id} className="hover:shadow-md transition-shadow">
-                        <CardContent className="pt-5">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Building2 className="h-4 w-4 text-primary shrink-0" />
-                                <p className="font-heading font-semibold text-foreground truncate">{p.name}</p>
-                              </div>
-                              <p className="text-xs text-muted-foreground truncate">{p.address || '—'}</p>
-                              <p className="text-xs text-muted-foreground">{p.phone || '—'}</p>
-                              <p className="text-xs text-muted-foreground">{p.email || '—'}</p>
-                              {p.opening_time && p.closing_time && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  🕐 {p.opening_time.slice(0,5)} – {p.closing_time.slice(0,5)}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-col gap-1.5 shrink-0 items-end">
-                              <Badge variant="outline" className={p.is_active
-                                ? 'bg-success/10 text-success border-success/20 text-[10px]'
-                                : 'bg-muted text-muted-foreground text-[10px]'}>
-                                {p.is_active ? 'Active' : 'Inactive'}
-                              </Badge>
-                              {p.accepts_medical_aid && (
-                                <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-[10px]">
-                                  Med Aid
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Mini stats */}
-                          <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-                            <div className="rounded-lg bg-muted/50 p-2 text-center">
-                              <p className="font-bold text-foreground text-base">
-                                {reservations.filter(r => r.pharmacy_id === p.id && r.status === 'pending').length}
-                              </p>
-                              <p className="text-muted-foreground">Pending</p>
-                            </div>
-                            <div className="rounded-lg bg-muted/50 p-2 text-center">
-                              <p className="font-bold text-foreground text-base">
-                                {reservations.filter(r => r.pharmacy_id === p.id && r.status === 'confirmed').length}
-                              </p>
-                              <p className="text-muted-foreground">Confirmed</p>
-                            </div>
-                            <div className="rounded-lg bg-muted/50 p-2 text-center">
-                              <p className="font-bold text-foreground text-base">
-                                {inventory.filter(i => i.pharmacy_id === p.id).length}
-                              </p>
-                              <p className="text-muted-foreground">Stock Items</p>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="mt-3 grid grid-cols-3 gap-2">
-                            <Button size="sm" variant="outline"
-                              onClick={() => {
-                                setSelectedPhar(p);
-                                setPharForm({
-                                  name:               p.name,
-                                  address:            p.address || '',
-                                  phone:              p.phone || '',
-                                  email:              p.email || '',
-                                  opening_time:       p.opening_time?.slice(0,5) || '',
-                                  closing_time:       p.closing_time?.slice(0,5) || '',
-                                  accepts_medical_aid: p.accepts_medical_aid,
-                                });
-                                setPharDialog('edit');
-                              }}>
-                              <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                            </Button>
-                            <Button size="sm" variant="outline"
-                              onClick={() => { setSelectedPharmacyId(p.id); setActiveTab('reservations'); }}>
-                              <ClipboardList className="h-3.5 w-3.5 mr-1" /> Reservations
-                            </Button>
-                            <Button size="sm" variant="outline"
-                              onClick={() => { setSelectedPharmacyId(p.id); setActiveTab('inventory'); }}>
-                              <FlaskConical className="h-3.5 w-3.5 mr-1" /> Inventory
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+    {myPharmacies.length === 0 ? (
+      <p className="text-center py-12 text-muted-foreground">No pharmacies found.</p>
+    ) : (
+      <div className="grid gap-4 grid-cols-1">
+        {myPharmacies.map((p) => (
+          <Card key={p.id} className="hover:shadow-md transition-shadow overflow-hidden">
+            <CardContent className="p-4 sm:p-5">
+              {/* Header with name and badges */}
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Building2 className="h-4 w-4 text-primary shrink-0" />
+                    <p className="font-heading font-semibold text-base sm:text-lg text-foreground break-words">
+                      {p.name}
+                    </p>
                   </div>
+                </div>
+                <div className="flex flex-col gap-1.5 shrink-0 items-end">
+                  <Badge variant="outline" className={p.is_active
+                    ? 'bg-success/10 text-success border-success/20 text-[10px] sm:text-xs'
+                    : 'bg-muted text-muted-foreground text-[10px] sm:text-xs'}>
+                    {p.is_active ? 'Active' : 'Inactive'}
+                  </Badge>
+                  {p.accepts_medical_aid && (
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-[10px] sm:text-xs whitespace-nowrap">
+                      Med Aid
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Address and contact info */}
+              <div className="space-y-1.5 mb-4">
+                {p.address && (
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words leading-relaxed">
+                    📍 {p.address}
+                  </p>
+                )}
+                {p.phone && (
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    📞 {p.phone}
+                  </p>
+                )}
+                {p.email && (
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">
+                    ✉️ {p.email}
+                  </p>
+                )}
+                {p.opening_time && p.closing_time && (
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    🕐 {p.opening_time.slice(0,5)} – {p.closing_time.slice(0,5)}
+                  </p>
                 )}
               </div>
-            )}
+
+              {/* Mini stats - responsive grid */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="rounded-lg bg-muted/50 p-2 text-center">
+                  <p className="font-bold text-foreground text-lg sm:text-xl">
+                    {reservations.filter(r => r.pharmacy_id === p.id && r.status === 'pending').length}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Pending</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2 text-center">
+                  <p className="font-bold text-foreground text-lg sm:text-xl">
+                    {reservations.filter(r => r.pharmacy_id === p.id && r.status === 'confirmed').length}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Confirmed</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2 text-center">
+                  <p className="font-bold text-foreground text-lg sm:text-xl">
+                    {inventory.filter(i => i.pharmacy_id === p.id).length}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Stock Items</p>
+                </div>
+              </div>
+
+              {/* Action buttons - stacked on mobile, row on tablet+ */}
+              <div className="flex flex-col sm:grid sm:grid-cols-3 gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    setSelectedPhar(p);
+                    setPharForm({
+                      name:               p.name,
+                      address:            p.address || '',
+                      phone:              p.phone || '',
+                      email:              p.email || '',
+                      opening_time:       p.opening_time?.slice(0,5) || '',
+                      closing_time:       p.closing_time?.slice(0,5) || '',
+                      accepts_medical_aid: p.accepts_medical_aid,
+                    });
+                    setPharDialog('edit');
+                  }}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="w-full justify-center"
+                  onClick={() => { setSelectedPharmacyId(p.id); setActiveTab('reservations'); }}>
+                  <ClipboardList className="h-3.5 w-3.5 mr-1" /> Reservations
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="w-full justify-center"
+                  onClick={() => { setSelectedPharmacyId(p.id); setActiveTab('inventory'); }}>
+                  <FlaskConical className="h-3.5 w-3.5 mr-1" /> Inventory
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )}
+  </div>
+)}
 
             {/* ══════════════ RESERVATIONS ══════════════ */}
             {activeTab === 'reservations' && (
