@@ -1651,7 +1651,7 @@ const PharmacistDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ── Edit Pharmacy Dialog ── */}
+            {/* ── Edit Pharmacy Dialog ── */}
       <Dialog open={pharDialog === 'edit'}
         onOpenChange={o => { if (!o) { setPharDialog(null); setSelectedPhar(null); } }}>
         <DialogContent className="max-w-sm">
@@ -1701,11 +1701,21 @@ const PharmacistDashboard = () => {
                 className="h-4 w-4 accent-primary" />
             </div>
           </div>
-          <DialogFooter className="pt-2">
-            <Button variant="outline" onClick={() => { setPharDialog(null); setSelectedPhar(null); }}>
+          
+          {/* Updated DialogFooter with better spacing for mobile */}
+          <DialogFooter className="pt-4 gap-3 sm:gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => { setPharDialog(null); setSelectedPhar(null); }}
+              className="w-full sm:w-auto order-2 sm:order-1"
+            >
               Cancel
             </Button>
-            <Button onClick={handleUpdatePharmacy} disabled={pharProcessing}>
+            <Button 
+              onClick={handleUpdatePharmacy} 
+              disabled={pharProcessing}
+              className="w-full sm:w-auto order-1 sm:order-2"
+            >
               {pharProcessing ? 'Saving…' : 'Save Changes'}
             </Button>
           </DialogFooter>
