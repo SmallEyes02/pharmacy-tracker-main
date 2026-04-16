@@ -1703,7 +1703,7 @@ const PharmacistDashboard = () => {
           </div>
           
           {/* Updated DialogFooter with better spacing for mobile */}
-          <DialogFooter className="pt-4 gap-3 sm:gap-2">
+          <DialogFooter className="pt-6 gap-6 sm:gap-2">
             <Button 
               variant="outline" 
               onClick={() => { setPharDialog(null); setSelectedPhar(null); }}
