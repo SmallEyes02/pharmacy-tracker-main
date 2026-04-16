@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/Header';
 import MedicineSearchBar from '@/components/MedicineSearchBar';
 import AvailabilityCard from '@/components/AvailabilityCard';
-import { Pill, AlertTriangle, Loader2, MapPin, Building2 } from 'lucide-react';
+import { Pill, AlertTriangle, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLocationContext } from '@/contexts/LocationContext';
 import { haversineDistance, estimateTravelTime } from '@/hooks/useUserLocation';
@@ -140,9 +140,7 @@ const sortByDistance = (items: any[]) =>
 // ── Component ──────────────────────────────────────────────────────────────────
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
-  const query        = searchParams.get('q') || '';
-  const pharmacyId   = searchParams.get('pharmacy_id') || null;
-  const pharmacyName = searchParams.get('pharmacy_name') || null;
+  const query      = searchParams.get('q') || '';
   const forMed     = searchParams.get('for') || '';       // original out-of-stock medicine name
   const isAltMode  = searchParams.get('alternatives') === '1'; // came from "See alternatives" card
 
@@ -169,9 +167,8 @@ const SearchPage = () => {
     const fetch = async () => {
       setIsLoading(true);
       try {
-        // Build base query — eq() MUST come before or() to apply to the main table
-        let q = (supabase as any)
-          .from('pharmacy_inventory')
+        const { data, error } = await (supabase
+          .from('pharmacy_inventory' as any)
           .select(`
             id, price, stock_level,
             pharmacies:pharmacy_id (
@@ -182,33 +179,17 @@ const SearchPage = () => {
             medicines:medicine_id (
               id, name, description, category, dosage_form, strength
             )
-          `);
-
-        // Apply pharmacy filter FIRST, before the foreignTable .or() —
-        // PostgREST applies filters in order; chaining .eq after .or(foreignTable)
-        // causes it to be scoped to the foreign table instead of the main table.
-        if (pharmacyId) {
-          q = q.eq('pharmacy_id', pharmacyId);
-        }
-
-        q = q.or(
-          `name.ilike.%${query}%,category.ilike.%${query}%`,
-          { foreignTable: 'medicines' as any }
-        );
-
-        const { data, error } = await q;
+          `)
+          .or(
+            `name.ilike.%${query}%,category.ilike.%${query}%`,
+            { foreignTable: 'medicines' as any }
+          ) as any);
 
         if (error) throw error;
 
-        // Base filter: active pharmacies with valid medicine data
-        let valid = (data || []).filter(
+        const valid = (data || []).filter(
           (item: any) => item.pharmacies && item.medicines && item.pharmacies.is_active
         ) as RawResult[];
-
-        // Pharmacy-specific filter — when arriving from a pharmacy card
-        if (pharmacyId) {
-          valid = valid.filter((item: any) => item.pharmacies.id === pharmacyId);
-        }
 
         setRawResults(valid);
 
@@ -263,7 +244,7 @@ const SearchPage = () => {
     };
 
     fetch();
-  }, [query, pharmacyId]); // re-fetch when query OR pharmacy filter changes
+  }, [query]); // only re-fetch when query changes
 
   // ── Step 2: Recalculate distances when raw results OR location changes ─────
   // This runs instantly when location resolves — no extra network call
@@ -276,8 +257,8 @@ const SearchPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="container px-4 py-8">
-        <div className="mx-auto max-w-2xl mb-8">
+      <div className="container px-3 sm:px-4 py-6 sm:py-8">
+        <div className="w-full max-w-2xl mx-auto mb-6">
           <MedicineSearchBar />
         </div>
 
@@ -295,27 +276,6 @@ const SearchPage = () => {
                 These are not automatic substitutes — please confirm with your pharmacist or doctor before switching.
               </p>
             </div>
-          </div>
-        )}
-
-        {/* Pharmacy context banner */}
-        {pharmacyId && pharmacyName && (
-          <div className="mx-auto max-w-2xl mb-4 flex items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5">
-            <div className="flex items-center gap-2 text-sm font-medium text-primary">
-              <Building2 className="h-4 w-4 shrink-0" />
-              Showing stock at <span className="font-bold">{decodeURIComponent(pharmacyName)}</span>
-            </div>
-            <button
-              onClick={() => {
-                const params = new URLSearchParams(window.location.search);
-                params.delete('pharmacy_id');
-                params.delete('pharmacy_name');
-                window.location.search = params.toString();
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground underline"
-            >
-              Show all pharmacies
-            </button>
           </div>
         )}
 
@@ -338,10 +298,9 @@ const SearchPage = () => {
               <>
                 <p className="mb-4 text-sm text-muted-foreground">
                   {results.length} result{results.length !== 1 ? 's' : ''} for &ldquo;{query}&rdquo;
-                  {pharmacyName ? ` at ${decodeURIComponent(pharmacyName)}` : ''}
-                  {userLocation && !pharmacyId ? ' · sorted by distance' : ''}
+                  {userLocation ? ' · sorted by distance' : ''}
                 </p>
-                <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {results.map((item) => (
                     <AvailabilityCard key={item.id} item={item} />
                   ))}
@@ -356,17 +315,8 @@ const SearchPage = () => {
             ) : !query ? (
               <div className="mt-20 flex flex-col items-center text-center opacity-70">
                 <Pill className="h-16 w-16 mb-4 text-primary" />
-                {pharmacyName ? (
-                  <>
-                    <h3 className="text-lg font-semibold">Search {decodeURIComponent(pharmacyName)}&apos;s Stock</h3>
-                    <p className="text-sm mt-1">Type a medicine name to see what&apos;s available at this pharmacy</p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-lg font-semibold">Search for Medicines</h3>
-                    <p>Find real-time stock and prices in Gaborone</p>
-                  </>
-                )}
+                <h3 className="text-lg font-semibold">Search for Medicines</h3>
+                <p>Find real-time stock and prices in Gaborone</p>
               </div>
             ) : null}
 
@@ -408,7 +358,7 @@ const SearchPage = () => {
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {alternatives.map(alt => (
                       <button
                         key={alt.id}

@@ -1,6 +1,6 @@
-# 💊 Pharmacy Tracker Application
+# Pharmacy Tracker Application
 
-## 📌 Project Overview
+## Project Overview
 
 The **Pharmacy Tracker Application** is a web-based system designed to help users locate nearby pharmacies, check medicine availability, and make reservations in real time.
 
@@ -13,19 +13,19 @@ The system improves access to healthcare by providing:
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-- 🔍 Search for medicines across nearby pharmacies
-- 📍 Geolocation-based pharmacy discovery
-- 🏥 Pharmacy inventory management (Pharmacist dashboard)
-- 📦 Medicine reservation system
-- ⏱️ Automatic reservation expiry
-- 🛠️ Admin approval and user management
-- 🗺️ Interactive map with route directions
+- Search for medicines across nearby pharmacies
+- Geolocation-based pharmacy discovery
+- Pharmacy inventory management (Pharmacist dashboard)
+- Medicine reservation system
+- Automatic reservation expiry
+- Admin approval and user management
+- Interactive map with route directions
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 This project is built as a **Single-Page Application (SPA)** using a **Serverless/BaaS architecture** powered by Supabase.
 
@@ -35,7 +35,7 @@ This project is built as a **Single-Page Application (SPA)** using a **Serverles
 
 ---
 
-## 💻 Frontend Stack
+## Frontend Stack
 
 - **Framework:** React 18 + TypeScript
 - **Build Tool:** Vite
@@ -45,7 +45,7 @@ This project is built as a **Single-Page Application (SPA)** using a **Serverles
 
 ---
 
-## ☁️ Backend & Infrastructure (Supabase)
+## Backend & Infrastructure (Supabase)
 
 - **Database:** PostgreSQL 14 (Managed by Supabase)
 - **API Layer:** Auto-generated REST API via PostgREST
@@ -60,7 +60,7 @@ This project is built as a **Single-Page Application (SPA)** using a **Serverles
 
 ---
 
-## 🗄️ Data & Security
+## Data & Security
 
 - **Geospatial Support:** PostGIS
   - Stores pharmacy locations as `geography(Point, 4326)`
@@ -70,7 +70,7 @@ This project is built as a **Single-Page Application (SPA)** using a **Serverles
 
 ---
 
-## 🌍 Geolocation & Mapping
+## Geolocation & Mapping
 
 - **Location Detection:** Browser Geolocation API
 - **Distance Calculation:** Haversine Formula (TypeScript)
@@ -79,7 +79,7 @@ This project is built as a **Single-Page Application (SPA)** using a **Serverles
 
 ---
 
-## ⚙️ Setup & Installation
+## Setup & Installation
 
 ### Prerequisites
 

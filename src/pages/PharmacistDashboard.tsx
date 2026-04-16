@@ -334,7 +334,6 @@ const PharmacistDashboard = () => {
       return;
     }
 
-    // Enrich with medicine, pharmacy, and patient names in parallel
     const medicineIds     = [...new Set((data ?? []).map((r: any) => r.medicine_id).filter(Boolean))];
     const pharmacyIdsUniq = [...new Set((data ?? []).map((r: any) => r.pharmacy_id).filter(Boolean))];
     const userIds         = [...new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean))];
@@ -354,7 +353,6 @@ const PharmacistDashboard = () => {
     const medMap:     Record<string, string> = {};
     const pharMap:    Record<string, string> = {};
     const profileMap: Record<string, string> = {};
-
     (medRes.data     ?? []).forEach((m: any) => { medMap[m.id]          = m.name; });
     (pharRes.data    ?? []).forEach((p: any) => { pharMap[p.id]         = p.name; });
     (profileRes.data ?? []).forEach((p: any) => { profileMap[p.user_id] = p.full_name ?? 'Patient'; });
@@ -548,7 +546,7 @@ const PharmacistDashboard = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
 
       {/* ── Sidebar ── */}
       <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-card">
@@ -609,7 +607,7 @@ const PharmacistDashboard = () => {
       </aside>
 
       {/* ── Main ── */}
-      <main className="flex-1 overflow-auto p-8 min-w-0">
+      <main className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 min-w-0 pb-24 md:pb-8">
 
         {/* Status banners */}
         {isPending && (
@@ -745,7 +743,7 @@ const PharmacistDashboard = () => {
                 {myPharmacies.length === 0 ? (
                   <p className="text-center py-12 text-muted-foreground">No pharmacies found.</p>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                     {myPharmacies.map((p) => (
                       <Card key={p.id} className="hover:shadow-md transition-shadow">
                         <CardContent className="pt-5">
@@ -837,36 +835,35 @@ const PharmacistDashboard = () => {
 
             {/* ══════════════ RESERVATIONS ══════════════ */}
             {activeTab === 'reservations' && (
-              <div className="space-y-5 w-full">
-                {/* Header */}
-                <div className="flex items-center justify-between">
+              <div className="space-y-4 w-full">
+                <div className="flex items-center justify-between gap-2">
                   <div>
-                    <h1 className="font-heading text-3xl font-bold text-foreground">Reservations</h1>
-                    <p className="text-base text-muted-foreground mt-1">Manage incoming medicine reservations from patients</p>
+                    <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">Reservations</h1>
+                    <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage incoming reservations from patients</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={fetchReservations} disabled={resLoading}>
-                    <RefreshCw className={`h-4 w-4 mr-1 ${resLoading ? 'animate-spin' : ''}`} />
-                    Refresh
+                    <RefreshCw className={`h-4 w-4 ${resLoading ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline ml-1">Refresh</span>
                   </Button>
                 </div>
 
-                {/* Workflow guide */}
-                <div className="flex items-center gap-3 text-sm text-muted-foreground bg-muted/40 rounded-lg px-4 py-3 flex-wrap">
-                  <span className="font-semibold text-foreground">Workflow:</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning inline-block" />Pending</span>
+                {/* Workflow guide — hidden on smallest screens */}
+                <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground bg-muted/40 rounded-lg px-4 py-2.5 flex-wrap">
+                  <span className="font-semibold text-foreground text-sm">Workflow:</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning inline-block"/>Pending</span>
                   <span className="opacity-40">→</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success inline-block" />Confirmed (set aside medicine)</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-success inline-block"/>Confirmed</span>
                   <span className="opacity-40">→</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />Ready for Pickup</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-500 inline-block"/>Ready</span>
                   <span className="opacity-40">→</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary inline-block" />Fulfilled</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary inline-block"/>Fulfilled</span>
                 </div>
 
-                {/* Filter tabs */}
-                <div className="flex gap-2 flex-wrap">
+                {/* Filter tabs — scrollable on mobile */}
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                   {(['all','pending','confirmed','ready','fulfilled','cancelled'] as const).map(f => (
                     <button key={f} onClick={() => setResFilter(f)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors
+                      className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors
                         ${resFilter === f
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'border-border text-muted-foreground hover:border-primary/40'}`}>
@@ -880,11 +877,10 @@ const PharmacistDashboard = () => {
                   ))}
                 </div>
 
-                {/* Content */}
                 {resLoading ? (
                   <div className="flex items-center justify-center py-16">
                     <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground mr-2" />
-                    <span className="text-muted-foreground">Loading reservations…</span>
+                    <span className="text-muted-foreground">Loading…</span>
                   </div>
                 ) : filteredRes.length === 0 ? (
                   <div className="flex flex-col items-center py-16 text-center">
@@ -892,12 +888,10 @@ const PharmacistDashboard = () => {
                     <p className="font-medium text-muted-foreground">No {resFilter !== 'all' ? resFilter : ''} reservations</p>
                   </div>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {filteredRes.map(res => {
                       const cfg        = statusConfig[res.status] ?? statusConfig.pending;
                       const StatusIcon = cfg.icon;
-
-                      // Expiry countdown
                       const expiryText = (() => {
                         if (!res.expiry_at || !['pending','confirmed'].includes(res.status)) return null;
                         const diff = new Date(res.expiry_at as string).getTime() - Date.now();
@@ -908,10 +902,9 @@ const PharmacistDashboard = () => {
                           ? { text: `${min}m left`, urgent: true }
                           : { text: `${hrs}h ${min}m left`, urgent: hrs < 1 };
                       })();
-
                       return (
                         <div key={res.id}
-                          className={`rounded-xl border bg-card p-4 shadow-sm flex flex-col gap-3 transition-all hover:shadow-md
+                          className={`rounded-xl border bg-card p-4 shadow-sm flex flex-col gap-3 transition-all
                             ${res.status === 'pending'   ? 'border-warning/50' :
                               res.status === 'confirmed' ? 'border-success/50' :
                               res.status === 'ready'     ? 'border-blue-500/50' :
@@ -924,8 +917,7 @@ const PharmacistDashboard = () => {
                               {res.reference ?? '—'}
                             </span>
                             <Badge variant="outline" className={cfg.className}>
-                              <StatusIcon className="mr-1 h-3 w-3" />
-                              {cfg.label}
+                              <StatusIcon className="mr-1 h-3 w-3" />{cfg.label}
                             </Badge>
                           </div>
 
@@ -935,19 +927,16 @@ const PharmacistDashboard = () => {
                               {(res.patient_name ?? 'P')[0].toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-sm text-foreground truncate">
-                                {res.patient_name ?? 'Patient'}
-                              </p>
+                              <p className="font-semibold text-sm text-foreground truncate">{res.patient_name ?? 'Patient'}</p>
                               <p className="text-xs text-muted-foreground">
                                 {new Date(res.requested_at).toLocaleString('en-BW', {
-                                  month: 'short', day: 'numeric',
-                                  hour: '2-digit', minute: '2-digit',
+                                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
                                 })}
                               </p>
                             </div>
                           </div>
 
-                          {/* Medicine + Qty */}
+                          {/* Medicine */}
                           <div className="rounded-lg bg-muted/40 px-3 py-2.5">
                             <p className="font-semibold text-sm text-foreground">{res.medicine_name}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
@@ -956,41 +945,41 @@ const PharmacistDashboard = () => {
                             </p>
                           </div>
 
-                          {/* Expiry warning */}
+                          {/* Expiry */}
                           {expiryText && (
                             <p className={`text-xs flex items-center gap-1 ${expiryText.urgent ? 'text-destructive' : 'text-warning'}`}>
-                              <Clock className="h-3 w-3" /> {expiryText.text}
+                              <Clock className="h-3 w-3"/>{expiryText.text}
                             </p>
                           )}
 
-                          {/* Action buttons */}
+                          {/* Actions */}
                           <div className="flex flex-col gap-2 mt-auto pt-1">
                             {res.status === 'pending' && (<>
                               <Button size="sm" className="w-full gap-1.5"
                                 onClick={() => updateReservation(res.id, 'confirmed')}>
-                                <CheckCircle className="h-4 w-4" /> Confirm — Set Aside Medicine
+                                <CheckCircle className="h-4 w-4"/>Confirm — Set Aside Medicine
                               </Button>
                               <Button size="sm" variant="ghost"
                                 className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => updateReservation(res.id, 'cancelled')}>
-                                <XCircle className="h-4 w-4 mr-1" /> Cancel Reservation
+                                <XCircle className="h-4 w-4 mr-1"/>Cancel Reservation
                               </Button>
                             </>)}
                             {res.status === 'confirmed' && (<>
                               <Button size="sm" variant="secondary" className="w-full gap-1.5"
                                 onClick={() => updateReservation(res.id, 'ready')}>
-                                <Package className="h-4 w-4" /> Mark Ready for Pickup
+                                <Package className="h-4 w-4"/>Mark Ready for Pickup
                               </Button>
                               <Button size="sm" variant="ghost"
                                 className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => updateReservation(res.id, 'cancelled')}>
-                                <XCircle className="h-4 w-4 mr-1" /> Cancel
+                                <XCircle className="h-4 w-4 mr-1"/>Cancel
                               </Button>
                             </>)}
                             {res.status === 'ready' && (
                               <Button size="sm" className="w-full gap-1.5 bg-primary hover:bg-primary/90"
                                 onClick={() => updateReservation(res.id, 'fulfilled')}>
-                                <CheckCircle className="h-4 w-4" /> Fulfilled — Patient Collected
+                                <CheckCircle className="h-4 w-4"/>Fulfilled — Patient Collected
                               </Button>
                             )}
                             {['fulfilled','cancelled','expired'].includes(res.status) && (
@@ -1612,6 +1601,46 @@ const PharmacistDashboard = () => {
         </DialogContent>
       </Dialog>
 
+            {/* ── Mobile Bottom Navigation ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex items-center justify-around px-1 py-2 safe-area-pb">
+        {([
+          { key: 'overview',     label: 'Home',         icon: LayoutDashboard },
+          { key: 'pharmacies',   label: 'Pharmacies',   icon: Store },
+          { key: 'reservations', label: 'Reservations', icon: ClipboardList, badge: resCounts.pending },
+          { key: 'inventory',    label: 'Inventory',    icon: FlaskConical },
+          { key: 'analytics',    label: 'Analytics',    icon: BarChart3 },
+        ] as { key: Tab; label: string; icon: React.ElementType; badge?: number }[]).map(({ key, label, icon: Icon, badge }) => (
+          <button
+            key={key}
+            onClick={() => isApproved ? setActiveTab(key) : undefined}
+            disabled={!isApproved}
+            className={`relative flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors min-w-[52px]
+              ${!isApproved ? 'opacity-30 cursor-not-allowed' : ''}
+              ${activeTab === key && isApproved ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            <div className="relative">
+              <Icon className="h-5 w-5" />
+              {badge != null && badge > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-warning text-[9px] font-bold text-white">
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-medium leading-none">{label}</span>
+            {activeTab === key && isApproved && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full bg-primary" />
+            )}
+          </button>
+        ))}
+        {/* Sign out button on mobile */}
+        <button
+          onClick={() => { supabase.auth.signOut(); navigate('/auth'); }}
+          className="relative flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors min-w-[52px] text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="h-5 w-5" />
+          <span className="text-[10px] font-medium leading-none">Sign Out</span>
+        </button>
+      </nav>
     </div>
   );
 };

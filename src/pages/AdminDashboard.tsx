@@ -21,7 +21,7 @@ import {
 import {
   ShieldCheck, RefreshCw, Eye, CheckCircle, XCircle, Clock,
   Building2, Users, LayoutDashboard, LogOut, Trash2, Pencil,
-  UserPlus, Search,
+  UserPlus, Search, ChevronDown,
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -61,15 +61,15 @@ interface UserRow {
 // ── Status config ─────────────────────────────────────────────────────────────
 
 const statusConfig: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-  pending:  { label: 'Pending',  icon: Clock,       className: 'bg-warning/15 text-warning border-warning/30 font-semibold'                   },
-  approved: { label: 'Approved', icon: CheckCircle, className: 'bg-success/15 text-success border-success/30 font-semibold'                   },
-  rejected: { label: 'Rejected', icon: XCircle,     className: 'bg-destructive/15 text-destructive border-destructive/30 font-semibold'       },
+  pending:  { label: 'Pending',  icon: Clock,       className: 'bg-warning/10 text-warning border-warning/20'             },
+  approved: { label: 'Approved', icon: CheckCircle, className: 'bg-success/10 text-success border-success/20'             },
+  rejected: { label: 'Rejected', icon: XCircle,     className: 'bg-destructive/10 text-destructive border-destructive/20' },
 };
 
 const roleColors: Record<string, string> = {
-  admin:      'bg-primary/15 text-primary border-primary/30 font-semibold',
-  pharmacist: 'bg-blue-500/15 text-blue-700 border-blue-500/30 font-semibold',
-  patient:    'bg-secondary text-secondary-foreground border-border font-medium',
+  admin:       'bg-primary/10 text-primary border-primary/20',
+  pharmacist:  'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  patient:     'bg-muted text-muted-foreground border-border',
 };
 
 type Tab = 'overview' | 'applications' | 'users';
@@ -80,9 +80,8 @@ const AdminDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  const [isAdmin, setIsAdmin]     = useState(false);
-  const [adminName, setAdminName] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [isAdmin, setIsAdmin]         = useState(false);
+  const [activeTab, setActiveTab]     = useState<Tab>('overview');
 
   // Applications state
   const [applications, setApplications] = useState<PharmacyApplication[]>([]);
@@ -93,13 +92,13 @@ const AdminDashboard = () => {
   const [processing, setProcessing]     = useState(false);
 
   // Users state
-  const [users, setUsers]                   = useState<UserRow[]>([]);
-  const [userLoading, setUserLoading]       = useState(false);
-  const [userSearch, setUserSearch]         = useState('');
-  const [selectedUser, setSelectedUser]     = useState<UserRow | null>(null);
-  const [userDialog, setUserDialog]         = useState<'edit' | 'delete' | 'create' | null>(null);
-  const [userForm, setUserForm]             = useState({ full_name: '', phone: '', role: 'patient' as UserRow['role'] });
-  const [newUserForm, setNewUserForm]       = useState({ email: '', full_name: '', phone: '', role: 'patient' as UserRow['role'] });
+  const [users, setUsers]               = useState<UserRow[]>([]);
+  const [userLoading, setUserLoading]   = useState(false);
+  const [userSearch, setUserSearch]     = useState('');
+  const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+  const [userDialog, setUserDialog]     = useState<'edit' | 'delete' | 'create' | null>(null);
+  const [userForm, setUserForm]         = useState({ full_name: '', phone: '', role: 'patient' as UserRow['role'] });
+  const [newUserForm, setNewUserForm]   = useState({ email: '', full_name: '', phone: '', role: 'patient' as UserRow['role'] });
   const [userProcessing, setUserProcessing] = useState(false);
 
   // ── Auth guard ───────────────────────────────────────────────────────────────
@@ -107,7 +106,7 @@ const AdminDashboard = () => {
     if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
 
-  // ── Role check + fetch admin name ─────────────────────────────────────────────
+  // ── Role check ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const check = async () => {
@@ -121,13 +120,6 @@ const AdminDashboard = () => {
         return;
       }
       setIsAdmin(true);
-
-      const { data: profile } = await (supabase as any)
-        .from('profiles')
-        .select('full_name')
-        .eq('user_id', user.id)
-        .single();
-      setAdminName(profile?.full_name ?? null);
     };
     check();
   }, [user, navigate]);
@@ -145,9 +137,13 @@ const AdminDashboard = () => {
   };
 
   // ── Fetch users ───────────────────────────────────────────────────────────────
+  // Calls the admin-list-users edge function which uses the service role
+  // to access auth.users directly — no RPC migration needed.
+  // Falls back to profiles table so users without completed signup still show.
   const fetchUsers = async () => {
     setUserLoading(true);
 
+    // Fetch profiles + roles in parallel from the client
     const [profilesRes, rolesRes] = await Promise.all([
       (supabase as any).from('profiles').select('user_id, full_name, phone, created_at'),
       (supabase as any).from('user_roles').select('user_id, role'),
@@ -159,6 +155,7 @@ const AdminDashboard = () => {
       return;
     }
 
+    // Fetch auth user list (emails) via edge function
     const { data: edgeData, error: edgeError } = await supabase.functions.invoke('admin-list-users');
 
     const roleMap: Record<string, string> = {};
@@ -169,6 +166,7 @@ const AdminDashboard = () => {
       edgeData.users.forEach((u: any) => { emailMap[u.id] = u.email; });
     }
 
+    // Build from profiles — every confirmed user has a profile row
     const fromProfiles: UserRow[] = (profilesRes.data ?? []).map((p: any) => ({
       id:         p.user_id,
       email:      emailMap[p.user_id] ?? '—',
@@ -178,10 +176,11 @@ const AdminDashboard = () => {
       created_at: p.created_at,
     }));
 
+    // Also include auth users that have no profile yet (invited but not signed up)
     if (!edgeError && edgeData?.users) {
       const profileIds = new Set(fromProfiles.map((u) => u.id));
       const pending: UserRow[] = edgeData.users
-        .filter((u: any) => !profileIds.has(u.id) && roleMap[u.id])
+        .filter((u: any) => !profileIds.has(u.id))
         .map((u: any) => ({
           id:         u.id,
           email:      u.email ?? '—',
@@ -204,22 +203,33 @@ const AdminDashboard = () => {
     fetchUsers();
   }, [isAdmin]);
 
-  // ── Application actions ───────────────────────────────────────────────────────
+  // ── Application actions ────────────────────────────────────────────────────────
   const handleAppAction = async (id: string, action: 'approved' | 'rejected') => {
     setProcessing(true);
 
     if (action === 'approved') {
+      // Edge function handles: create auth user → profile → role → pharmacy record → mark approved
       const { data, error } = await supabase.functions.invoke('approve-pharmacy', {
         body: { application_id: id, admin_notes: adminNotes },
       });
+
       if (error) {
-        toast.error('Approval failed: ' + ((data as any)?.error ?? error.message));
+        const msg = (data as any)?.error ?? error.message;
+        toast.error('Approval failed: ' + msg);
         setProcessing(false);
         return;
       }
-      await (supabase.from('pharmacy_applications').update({ reviewed_by: user?.id } as any).eq('id', id) as any);
+
+      // Stamp reviewed_by (edge function sets status/pharmacy_id)
+      await (supabase
+        .from('pharmacy_applications')
+        .update({ reviewed_by: user?.id } as any)
+        .eq('id', id) as any);
+
       toast.success('Pharmacy approved! Pharmacist invite sent.');
+
     } else {
+      // Rejection is a simple status update — no edge function needed
       const { error } = await (supabase
         .from('pharmacy_applications')
         .update({
@@ -229,11 +239,13 @@ const AdminDashboard = () => {
           reviewed_by: user?.id,
         } as any)
         .eq('id', id) as any);
+
       if (error) {
         toast.error('Rejection failed: ' + error.message);
         setProcessing(false);
         return;
       }
+
       toast.success('Application rejected.');
     }
 
@@ -243,16 +255,20 @@ const AdminDashboard = () => {
     setProcessing(false);
   };
 
-  // ── Update user ───────────────────────────────────────────────────────────────
+  // ── User CRUD ──────────────────────────────────────────────────────────────────
+
+  // UPDATE: edit profile fields + role
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
     setUserProcessing(true);
 
+    // Update profile
     const { error: pErr } = await (supabase as any)
       .from('profiles')
       .update({ full_name: userForm.full_name, phone: userForm.phone })
       .eq('user_id', selectedUser.id);
 
+    // Update role: delete existing then insert new
     const { error: dErr } = await (supabase as any)
       .from('user_roles')
       .delete()
@@ -274,45 +290,38 @@ const AdminDashboard = () => {
     await fetchUsers();
   };
 
-  // ── Delete user ───────────────────────────────────────────────────────────────
+  // DELETE: remove profile + roles (auth user stays — admin can deactivate manually)
   const handleDeleteUser = async () => {
     if (!selectedUser) return;
     setUserProcessing(true);
 
-    const deletedId = selectedUser.id;
-
     const { error: rErr } = await (supabase as any)
       .from('user_roles')
       .delete()
-      .eq('user_id', deletedId);
+      .eq('user_id', selectedUser.id);
 
     const { error: pErr } = await (supabase as any)
       .from('profiles')
       .delete()
-      .eq('user_id', deletedId);
+      .eq('user_id', selectedUser.id);
 
-    const { error: authErr } = await (supabase as any).rpc('delete_user_by_admin', {
-      target_user_id: deletedId,
-    });
-
-    if (rErr || pErr || authErr) {
-      toast.error('Delete failed: ' + (rErr?.message ?? pErr?.message ?? authErr?.message));
-      setUserProcessing(false);
-      return;
+    if (rErr || pErr) {
+      toast.error('Delete failed: ' + (rErr?.message ?? pErr?.message));
+    } else {
+      toast.success('User removed from the system.');
     }
 
-    toast.success('User removed from the system.');
-    setUsers((prev) => prev.filter((u) => u.id !== deletedId));
+    setUserProcessing(false);
     setUserDialog(null);
     setSelectedUser(null);
-    setUserProcessing(false);
     await fetchUsers();
   };
 
-  // ── Create / invite user ──────────────────────────────────────────────────────
+  // CREATE: invite a new user via Supabase auth admin invite
   const handleCreateUser = async () => {
     setUserProcessing(true);
 
+    // Use edge function or RPC to call admin.inviteUserByEmail server-side
     const { data, error } = await supabase.functions.invoke('admin-invite-user', {
       body: {
         email:     newUserForm.email,
@@ -349,19 +358,19 @@ const AdminDashboard = () => {
   };
 
   const userCounts = {
-    total:       users.length,
-    admins:      users.filter((u) => u.role === 'admin').length,
+    total:      users.length,
+    admins:     users.filter((u) => u.role === 'admin').length,
     pharmacists: users.filter((u) => u.role === 'pharmacist').length,
-    patients:    users.filter((u) => u.role === 'patient').length,
+    patients:   users.filter((u) => u.role === 'patient').length,
   };
 
-  // ── Loading screen ─────────────────────────────────────────────────────────────
+  // ── Loading ────────────────────────────────────────────────────────────────────
   if (authLoading || (user && !isAdmin)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <ShieldCheck className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
-          <p className="text-base font-medium text-foreground">Verifying admin access…</p>
+          <p className="text-muted-foreground">Verifying admin access…</p>
         </div>
       </div>
     );
@@ -369,21 +378,16 @@ const AdminDashboard = () => {
 
   // ── Render ─────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
 
-      {/* ══════════════════ SIDEBAR ══════════════════ */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card">
-
+      {/* ── Admin Sidebar Nav ── */}
+      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-card">
         {/* Brand */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary shrink-0">
-            <ShieldCheck className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-heading font-bold text-base text-foreground leading-tight">Admin Panel</p>
-            <p className="text-xs text-muted-foreground truncate max-w-[148px] mt-0.5">
-              {adminName ?? user?.email}
-            </p>
+        <div className="flex items-center gap-2.5 px-5 py-5 border-b border-border">
+          <ShieldCheck className="h-6 w-6 text-primary" />
+          <div>
+            <p className="font-heading font-bold text-sm text-foreground">Admin Panel</p>
+            <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{user?.email}</p>
           </div>
         </div>
 
@@ -391,30 +395,28 @@ const AdminDashboard = () => {
         <nav className="flex-1 p-3 space-y-1">
           {(
             [
-              { key: 'overview',     label: 'Overview',     icon: LayoutDashboard, badge: undefined         },
-              { key: 'applications', label: 'Applications', icon: Building2,       badge: appCounts.pending },
-              { key: 'users',        label: 'Manage Users', icon: Users,           badge: undefined         },
+              { key: 'overview',      label: 'Overview',      icon: LayoutDashboard, badge: undefined },
+              { key: 'applications',  label: 'Applications',  icon: Building2,       badge: appCounts.pending },
+              { key: 'users',         label: 'Manage Users',  icon: Users,           badge: undefined },
             ] as { key: Tab; label: string; icon: React.ElementType; badge: number | undefined }[]
           ).map(({ key, label, icon: Icon, badge }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
               className={`
-                w-full flex items-center justify-between gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-150
+                w-full flex items-center justify-between gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                 ${activeTab === key
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-foreground/70 hover:bg-secondary hover:text-foreground'}
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'}
               `}
             >
               <span className="flex items-center gap-2.5">
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-4 w-4" />
                 {label}
               </span>
               {badge != null && badge > 0 && (
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${
-                  activeTab === key
-                    ? 'bg-white/25 text-white'
-                    : 'bg-warning/20 text-warning'
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                  activeTab === key ? 'bg-white/20 text-white' : 'bg-warning/20 text-warning'
                 }`}>
                   {badge}
                 </span>
@@ -427,73 +429,84 @@ const AdminDashboard = () => {
         <div className="p-3 border-t border-border">
           <button
             onClick={() => { supabase.auth.signOut(); navigate('/auth'); }}
-            className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground/60 hover:bg-destructive/10 hover:text-destructive transition-all duration-150"
+            className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
-            <LogOut className="h-4 w-4 shrink-0" />
+            <LogOut className="h-4 w-4" />
             Sign Out
           </button>
         </div>
       </aside>
 
-      {/* ══════════════════ MOBILE TOP BAR ══════════════════ */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 h-14 shadow-sm">
+      {/* ── Mobile top bar ── */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 h-14">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-primary" />
-          <span className="font-heading font-bold text-sm text-foreground">Admin Panel</span>
+          <span className="font-heading font-bold text-base">Admin Panel</span>
         </div>
-        <div className="flex gap-1">
-          {(
-            [
-              { key: 'overview',     label: '⊞' },
-              { key: 'applications', label: '🏥' },
-              { key: 'users',        label: '👥' },
-            ] as { key: Tab; label: string }[]
-          ).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
-                activeTab === key
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={() => { supabase.auth.signOut(); navigate('/auth'); }}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
       </div>
 
-      {/* ══════════════════ MAIN CONTENT ══════════════════ */}
-      <main className="flex-1 overflow-auto md:p-8 p-4 pt-20 md:pt-8 bg-secondary/20">
+      {/* ── Mobile bottom nav ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex items-center justify-around px-2 py-2">
+        {([
+          { key: 'overview',     label: 'Overview',     icon: LayoutDashboard },
+          { key: 'applications', label: 'Applications', icon: Building2,       badge: appCounts.pending },
+          { key: 'users',        label: 'Users',        icon: Users },
+        ] as { key: Tab; label: string; icon: React.ElementType; badge?: number }[]).map(({ key, label, icon: Icon, badge }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`relative flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors
+              ${activeTab === key ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            <div className="relative">
+              <Icon className="h-5 w-5" />
+              {badge != null && badge > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-warning text-[9px] font-bold text-white">
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-medium">{label}</span>
+            {activeTab === key && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full bg-primary" />
+            )}
+          </button>
+        ))}
+      </nav>
 
-        {/* ════════════════ OVERVIEW ════════════════ */}
+      {/* ── Main content ── */}
+      <main className="flex-1 overflow-auto p-4 pt-20 md:pt-8 md:p-8 pb-24 md:pb-8 min-w-0">
+
+        {/* ══════════════════════════════════ OVERVIEW ══════════════════════════════════ */}
         {activeTab === 'overview' && (
-          <div className="space-y-6 w-full">
+          <div className="space-y-6 w-full max-w-5xl">
             <div>
-              <h1 className="font-heading text-3xl font-extrabold text-foreground tracking-tight">Overview</h1>
-              <p className="text-sm font-medium text-muted-foreground mt-1">System-wide summary</p>
+              <h1 className="font-heading text-2xl font-bold text-foreground">Overview</h1>
+              <p className="text-sm text-muted-foreground mt-1">System-wide summary</p>
             </div>
 
-            {/* Stat cards */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Total Users',      value: userCounts.total,       icon: Users,       color: 'text-blue-600',    bg: 'bg-blue-500/12',    bar: 'bg-blue-500'    },
-                { label: 'Pharmacists',      value: userCounts.pharmacists, icon: Building2,   color: 'text-emerald-600', bg: 'bg-emerald-500/12', bar: 'bg-emerald-500' },
-                { label: 'Pending Apps',     value: appCounts.pending,      icon: Clock,       color: 'text-amber-600',   bg: 'bg-amber-500/12',   bar: 'bg-amber-500'   },
-                { label: 'Active Pharmacies',value: appCounts.approved,     icon: CheckCircle, color: 'text-primary',     bg: 'bg-primary/12',     bar: 'bg-primary'     },
+                { label: 'Total Users',    value: userCounts.total,       icon: Users,       color: 'text-blue-600'  },
+                { label: 'Pharmacists',    value: userCounts.pharmacists,  icon: Building2,   color: 'text-emerald-600' },
+                { label: 'Pending Apps',   value: appCounts.pending,       icon: Clock,       color: 'text-amber-600' },
+                { label: 'Active Pharmacies', value: appCounts.approved,   icon: CheckCircle, color: 'text-primary'   },
               ].map((s) => (
-                <Card key={s.label} className="border-border shadow-card overflow-hidden">
-                  <div className={`h-1 w-full ${s.bar}`} />
-                  <CardContent className="pt-5 pb-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{s.label}</p>
-                        <p className="text-5xl font-extrabold text-foreground mt-2 leading-none tabular-nums">{s.value}</p>
+                <Card key={s.label}>
+                  <CardContent className="pt-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground">{s.label}</p>
+                        <p className="text-2xl font-bold text-foreground mt-0.5">{s.value}</p>
                       </div>
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${s.bg} shrink-0`}>
-                        <s.icon className={`h-6 w-6 ${s.color}`} />
-                      </div>
+                      <s.icon className={`h-8 w-8 ${s.color} opacity-80`} />
                     </div>
                   </CardContent>
                 </Card>
@@ -501,25 +514,24 @@ const AdminDashboard = () => {
             </div>
 
             {/* User breakdown */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <Card className="border-border shadow-card">
+            <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-foreground">User Breakdown</CardTitle>
+                <CardTitle className="text-sm font-semibold">User Breakdown</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {[
-                    { label: 'Patients',    count: userCounts.patients,    pct: userCounts.total ? Math.round(userCounts.patients    / userCounts.total * 100) : 0, color: 'bg-muted-foreground' },
-                    { label: 'Pharmacists', count: userCounts.pharmacists, pct: userCounts.total ? Math.round(userCounts.pharmacists / userCounts.total * 100) : 0, color: 'bg-blue-500'         },
-                    { label: 'Admins',      count: userCounts.admins,      pct: userCounts.total ? Math.round(userCounts.admins      / userCounts.total * 100) : 0, color: 'bg-primary'          },
+                    { label: 'Patients',    count: userCounts.patients,    pct: userCounts.total ? Math.round(userCounts.patients / userCounts.total * 100) : 0,    color: 'bg-muted-foreground' },
+                    { label: 'Pharmacists', count: userCounts.pharmacists, pct: userCounts.total ? Math.round(userCounts.pharmacists / userCounts.total * 100) : 0, color: 'bg-blue-500' },
+                    { label: 'Admins',      count: userCounts.admins,      pct: userCounts.total ? Math.round(userCounts.admins / userCounts.total * 100) : 0,      color: 'bg-primary' },
                   ].map((row) => (
                     <div key={row.label}>
-                      <div className="flex justify-between text-sm mb-1.5">
-                        <span className="font-semibold text-foreground">{row.label}</span>
-                        <span className="font-bold text-foreground">{row.count} <span className="text-muted-foreground font-normal">({row.pct}%)</span></span>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">{row.label}</span>
+                        <span className="font-medium">{row.count} ({row.pct}%)</span>
                       </div>
-                      <div className="h-2 rounded-full bg-border">
-                        <div className={`h-2 rounded-full ${row.color} transition-all duration-500`} style={{ width: `${row.pct}%` }} />
+                      <div className="h-1.5 rounded-full bg-border">
+                        <div className={`h-1.5 rounded-full ${row.color}`} style={{ width: `${row.pct}%` }} />
                       </div>
                     </div>
                   ))}
@@ -527,61 +539,57 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Application status */}
-            <Card className="border-border shadow-card">
+            {/* Application status breakdown */}
+            <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-foreground">Application Status</CardTitle>
+                <CardTitle className="text-sm font-semibold">Application Status</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-center h-full">
+                <div className="grid grid-cols-3 gap-4 text-center">
                   {[
-                    { label: 'Pending',  count: appCounts.pending,  className: 'text-warning',     bg: 'bg-warning/10 border-warning/25',         bar: 'bg-warning'     },
-                    { label: 'Approved', count: appCounts.approved, className: 'text-success',     bg: 'bg-success/10 border-success/25',         bar: 'bg-success'     },
-                    { label: 'Rejected', count: appCounts.rejected, className: 'text-destructive', bg: 'bg-destructive/10 border-destructive/25', bar: 'bg-destructive' },
+                    { label: 'Pending',  count: appCounts.pending,  className: 'text-warning'     },
+                    { label: 'Approved', count: appCounts.approved, className: 'text-success'     },
+                    { label: 'Rejected', count: appCounts.rejected, className: 'text-destructive' },
                   ].map((s) => (
-                    <div key={s.label} className={`rounded-xl border overflow-hidden ${s.bg}`}>
-                      <div className={`h-1 w-full ${s.bar}`} />
-                      <div className="p-4">
-                        <p className={`text-5xl font-extrabold leading-none tabular-nums ${s.className}`}>{s.count}</p>
-                        <p className={`text-sm font-bold mt-2 ${s.className} opacity-75`}>{s.label}</p>
-                      </div>
+                    <div key={s.label} className="rounded-lg border border-border p-3">
+                      <p className={`text-2xl font-bold ${s.className}`}>{s.count}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-            </div>{/* end two-col grid */}
           </div>
         )}
 
-        {/* ════════════════ APPLICATIONS ════════════════ */}
+        {/* ══════════════════════════════ APPLICATIONS ══════════════════════════════════ */}
         {activeTab === 'applications' && (
-          <div className="space-y-5 w-full">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="space-y-5 max-w-6xl">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="font-heading text-3xl font-extrabold text-foreground tracking-tight">Pharmacy Applications</h1>
-                <p className="text-sm font-medium text-muted-foreground mt-1">Review and approve incoming pharmacy registrations</p>
+                <h1 className="font-heading text-2xl font-bold text-foreground">Pharmacy Applications</h1>
+                <p className="text-sm text-muted-foreground mt-1">Review and approve incoming pharmacy registrations</p>
               </div>
-              <Button variant="outline" size="sm" onClick={fetchApplications} disabled={appLoading} className="font-semibold">
-                <RefreshCw className={`h-4 w-4 mr-1.5 ${appLoading ? 'animate-spin' : ''}`} />
+              <Button variant="outline" size="sm" onClick={fetchApplications} disabled={appLoading}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${appLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
 
             {/* Filter tabs */}
             <div className="flex gap-2 flex-wrap">
-              {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
+              {(['all','pending','approved','rejected'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setAppFilter(f)}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold border transition-all duration-150 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     appFilter === f
-                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                      : 'border-border text-foreground/70 bg-card hover:text-foreground hover:border-primary/40'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border text-muted-foreground hover:border-primary/40'
                   }`}
                 >
                   {f.charAt(0).toUpperCase() + f.slice(1)}
-                  <span className={`ml-2 text-xs font-bold ${appFilter === f ? 'opacity-80' : 'text-muted-foreground'}`}>
+                  <span className="ml-1.5 opacity-70">
                     {f === 'all' ? appCounts.all : appCounts[f]}
                   </span>
                 </button>
@@ -589,21 +597,21 @@ const AdminDashboard = () => {
             </div>
 
             {appLoading ? (
-              <p className="text-center py-12 text-base font-medium text-muted-foreground">Loading applications…</p>
+              <p className="text-center py-12 text-muted-foreground">Loading applications…</p>
             ) : filteredApps.length === 0 ? (
-              <p className="text-center py-12 text-base font-medium text-muted-foreground">No applications found.</p>
+              <p className="text-center py-12 text-muted-foreground">No applications found.</p>
             ) : (
-              <Card className="border-border shadow-card overflow-hidden">
+              <Card>
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-primary hover:bg-primary">
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Pharmacy</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Pharmacist</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">License No.</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Med. Aid</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Status</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Submitted</TableHead>
-                      <TableHead className="text-right text-xs font-bold uppercase tracking-wider text-primary-foreground">Actions</TableHead>
+                    <TableRow>
+                      <TableHead>Pharmacy</TableHead>
+                      <TableHead>Pharmacist</TableHead>
+                      <TableHead>License No.</TableHead>
+                      <TableHead>Med. Aid</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -611,31 +619,27 @@ const AdminDashboard = () => {
                       const cfg = statusConfig[app.status] ?? statusConfig.pending;
                       const StatusIcon = cfg.icon;
                       return (
-                        <TableRow key={app.id} className="hover:bg-secondary/30 transition-colors">
-                          <TableCell className="font-bold text-sm text-foreground">{app.pharmacy_name}</TableCell>
-                          <TableCell className="text-sm font-medium text-foreground/80">{app.pharmacist_name}</TableCell>
-                          <TableCell className="text-sm font-medium text-muted-foreground font-mono">{app.license_number}</TableCell>
+                        <TableRow key={app.id}>
+                          <TableCell className="font-medium">{app.pharmacy_name}</TableCell>
+                          <TableCell>{app.pharmacist_name}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{app.license_number}</TableCell>
                           <TableCell>
-                            <Badge
-                              variant={app.accepts_medical_aid ? 'default' : 'outline'}
-                              className={`text-xs font-semibold ${app.accepts_medical_aid ? '' : 'text-muted-foreground'}`}
-                            >
+                            <Badge variant={app.accepts_medical_aid ? 'default' : 'outline'}>
                               {app.accepts_medical_aid ? 'Yes' : 'No'}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={`text-xs ${cfg.className}`}>
+                            <Badge variant="outline" className={cfg.className}>
                               <StatusIcon className="mr-1 h-3 w-3" />
                               {cfg.label}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm font-medium text-muted-foreground">
+                          <TableCell className="text-xs text-muted-foreground">
                             {new Date(app.created_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
                               size="sm" variant="ghost"
-                              className="text-sm font-semibold hover:text-primary"
                               onClick={() => { setSelectedApp(app); setAdminNotes(app.admin_notes ?? ''); }}
                             >
                               <Eye className="h-4 w-4 mr-1" /> View
@@ -651,21 +655,21 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ════════════════ USERS ════════════════ */}
+        {/* ════════════════════════════════ USERS ════════════════════════════════════ */}
         {activeTab === 'users' && (
-          <div className="space-y-5 w-full">
+          <div className="space-y-5 max-w-6xl">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <h1 className="font-heading text-3xl font-extrabold text-foreground tracking-tight">Manage Users</h1>
-                <p className="text-sm font-medium text-muted-foreground mt-1">View, edit roles, and remove users</p>
+                <h1 className="font-heading text-2xl font-bold text-foreground">Manage Users</h1>
+                <p className="text-sm text-muted-foreground mt-1">View, edit roles, and remove users</p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={fetchUsers} disabled={userLoading} className="font-semibold">
-                  <RefreshCw className={`h-4 w-4 mr-1.5 ${userLoading ? 'animate-spin' : ''}`} />
+                <Button variant="outline" size="sm" onClick={fetchUsers} disabled={userLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-1 ${userLoading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
-                <Button size="sm" onClick={() => setUserDialog('create')} className="font-semibold">
-                  <UserPlus className="h-4 w-4 mr-1.5" /> Invite User
+                <Button size="sm" onClick={() => setUserDialog('create')}>
+                  <UserPlus className="h-4 w-4 mr-1" /> Invite User
                 </Button>
               </div>
             </div>
@@ -677,46 +681,45 @@ const AdminDashboard = () => {
                 placeholder="Search by name, email or role…"
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
-                className="pl-9 font-medium placeholder:text-muted-foreground/60"
+                className="pl-9"
               />
             </div>
 
             {userLoading ? (
-              <p className="text-center py-12 text-base font-medium text-muted-foreground">Loading users…</p>
+              <p className="text-center py-12 text-muted-foreground">Loading users…</p>
             ) : filteredUsers.length === 0 ? (
-              <p className="text-center py-12 text-base font-medium text-muted-foreground">No users found.</p>
+              <p className="text-center py-12 text-muted-foreground">No users found.</p>
             ) : (
-              <Card className="border-border shadow-card overflow-hidden">
+              <Card>
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-primary hover:bg-primary">
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Name</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Email</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Phone</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Role</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-primary-foreground">Joined</TableHead>
-                      <TableHead className="text-right text-xs font-bold uppercase tracking-wider text-primary-foreground">Actions</TableHead>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredUsers.map((u) => (
-                      <TableRow key={u.id} className="hover:bg-secondary/30 transition-colors">
-                        <TableCell className="font-bold text-sm text-foreground">{u.full_name ?? '—'}</TableCell>
-                        <TableCell className="text-sm font-medium text-foreground/75">{u.email}</TableCell>
-                        <TableCell className="text-sm font-medium text-muted-foreground">{u.phone ?? '—'}</TableCell>
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{u.phone ?? '—'}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`text-xs ${roleColors[u.role]}`}>
-                            {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                          <Badge variant="outline" className={roleColors[u.role]}>
+                            {u.role}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm font-medium text-muted-foreground">
+                        <TableCell className="text-xs text-muted-foreground">
                           {new Date(u.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               size="sm" variant="ghost"
-                              className="text-xs font-semibold hover:text-primary"
                               onClick={() => {
                                 setSelectedUser(u);
                                 setUserForm({ full_name: u.full_name ?? '', phone: u.phone ?? '', role: u.role });
@@ -725,10 +728,11 @@ const AdminDashboard = () => {
                             >
                               <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                             </Button>
+                            {/* Prevent admin from deleting themselves */}
                             {u.id !== user?.id && (
                               <Button
                                 size="sm" variant="ghost"
-                                className="text-xs font-semibold text-destructive hover:text-destructive hover:bg-destructive/10"
+                                className="text-destructive hover:text-destructive"
                                 onClick={() => { setSelectedUser(u); setUserDialog('delete'); }}
                               >
                                 <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
@@ -752,21 +756,21 @@ const AdminDashboard = () => {
           {selectedApp && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-lg font-bold text-foreground">
-                  <Building2 className="h-5 w-5 text-primary shrink-0" />
+                <DialogTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
                   {selectedApp.pharmacy_name}
                 </DialogTitle>
-                <DialogDescription className="text-sm font-medium text-muted-foreground">Application details</DialogDescription>
+                <DialogDescription>Application details</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 text-sm">
                 <Section title="Pharmacy Info">
-                  <Detail label="Address" value={selectedApp.address} />
-                  <Detail label="Phone"   value={selectedApp.phone}   />
-                  <Detail label="Email"   value={selectedApp.email}   />
+                  <Detail label="Address"  value={selectedApp.address} />
+                  <Detail label="Phone"    value={selectedApp.phone}   />
+                  <Detail label="Email"    value={selectedApp.email}   />
                 </Section>
                 <Section title="License">
-                  <Detail label="Number"    value={selectedApp.license_number}      />
+                  <Detail label="Number"    value={selectedApp.license_number}     />
                   <Detail label="Expiry"    value={selectedApp.license_expiry_date} />
                   <Detail label="Authority" value={selectedApp.issuing_authority}   />
                 </Section>
@@ -776,30 +780,29 @@ const AdminDashboard = () => {
                   <Detail label="Phone" value={selectedApp.pharmacist_phone} />
                 </Section>
                 <Section title="Operating Hours">
-                  <Detail label="Opens"       value={selectedApp.opening_time}                       />
-                  <Detail label="Closes"      value={selectedApp.closing_time}                       />
+                  <Detail label="Opens"       value={selectedApp.opening_time}                      />
+                  <Detail label="Closes"      value={selectedApp.closing_time}                      />
                   <Detail label="Medical Aid" value={selectedApp.accepts_medical_aid ? 'Yes' : 'No'} />
                 </Section>
 
                 {selectedApp.status === 'pending' ? (
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-foreground">Admin Notes <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                    <Label>Admin Notes (optional)</Label>
                     <Textarea
                       value={adminNotes}
                       onChange={(e) => setAdminNotes(e.target.value)}
                       placeholder="Notes about this decision…"
                       rows={3}
-                      className="text-sm font-medium placeholder:text-muted-foreground/60"
                     />
                   </div>
                 ) : selectedApp.admin_notes ? (
                   <Section title="Admin Notes">
-                    <p className="text-sm font-medium text-foreground/80">{selectedApp.admin_notes}</p>
+                    <p className="text-muted-foreground">{selectedApp.admin_notes}</p>
                   </Section>
                 ) : null}
 
                 {selectedApp.reviewed_at && (
-                  <p className="text-xs font-medium text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Reviewed {new Date(selectedApp.reviewed_at).toLocaleString()}
                   </p>
                 )}
@@ -808,8 +811,7 @@ const AdminDashboard = () => {
               {selectedApp.status === 'pending' && (
                 <DialogFooter className="gap-2 pt-2">
                   <Button
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 font-semibold"
+                    variant="ghost" className="text-destructive hover:text-destructive"
                     disabled={processing}
                     onClick={() => handleAppAction(selectedApp.id, 'rejected')}
                   >
@@ -817,7 +819,6 @@ const AdminDashboard = () => {
                     {processing ? 'Processing…' : 'Reject'}
                   </Button>
                   <Button
-                    className="font-semibold"
                     disabled={processing}
                     onClick={() => handleAppAction(selectedApp.id, 'approved')}
                   >
@@ -835,48 +836,48 @@ const AdminDashboard = () => {
       <Dialog open={userDialog === 'edit'} onOpenChange={(o) => { if (!o) { setUserDialog(null); setSelectedUser(null); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-foreground">Edit User</DialogTitle>
-            <DialogDescription className="text-sm font-medium text-muted-foreground">{selectedUser?.email}</DialogDescription>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>{selectedUser?.email}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-foreground">Full Name</Label>
+              <Label>Full Name</Label>
               <Input
                 value={userForm.full_name}
                 onChange={(e) => setUserForm((f) => ({ ...f, full_name: e.target.value }))}
                 placeholder="Full name"
-                className="font-medium"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-foreground">Phone</Label>
+              <Label>Phone</Label>
               <Input
                 value={userForm.phone}
                 onChange={(e) => setUserForm((f) => ({ ...f, phone: e.target.value }))}
                 placeholder="+267 71 234 567"
-                className="font-medium"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-foreground">Role</Label>
+              <Label>Role</Label>
               <Select
                 value={userForm.role}
                 onValueChange={(v) => setUserForm((f) => ({ ...f, role: v as UserRow['role'] }))}
               >
-                <SelectTrigger className="font-medium"><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="patient" className="font-medium">Patient</SelectItem>
-                  <SelectItem value="pharmacist" className="font-medium">Pharmacist</SelectItem>
-                  <SelectItem value="admin" className="font-medium">Admin</SelectItem>
+                  <SelectItem value="patient">Patient</SelectItem>
+                  <SelectItem value="pharmacist">Pharmacist</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter className="pt-2">
-            <Button variant="outline" className="font-semibold" onClick={() => { setUserDialog(null); setSelectedUser(null); }}>
+            <Button variant="outline" onClick={() => { setUserDialog(null); setSelectedUser(null); }}>
               Cancel
             </Button>
-            <Button className="font-semibold" onClick={handleUpdateUser} disabled={userProcessing}>
+            <Button onClick={handleUpdateUser} disabled={userProcessing}>
               {userProcessing ? 'Saving…' : 'Save Changes'}
             </Button>
           </DialogFooter>
@@ -887,18 +888,21 @@ const AdminDashboard = () => {
       <Dialog open={userDialog === 'delete'} onOpenChange={(o) => { if (!o) { setUserDialog(null); setSelectedUser(null); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-foreground">Remove User</DialogTitle>
-            <DialogDescription className="text-sm font-medium text-foreground/70">
-              This permanently removes{' '}
-              <strong className="text-foreground">{selectedUser?.full_name ?? selectedUser?.email}</strong> from the system,
-              including their profile, role, and auth account.
+            <DialogTitle>Remove User</DialogTitle>
+            <DialogDescription>
+              This removes <strong>{selectedUser?.full_name ?? selectedUser?.email}</strong> from the system.
+              Their auth account is retained but they will lose all profile data and role access.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-2 gap-2">
-            <Button variant="outline" className="font-semibold" onClick={() => { setUserDialog(null); setSelectedUser(null); }}>
+            <Button variant="outline" onClick={() => { setUserDialog(null); setSelectedUser(null); }}>
               Cancel
             </Button>
-            <Button variant="destructive" className="font-semibold" onClick={handleDeleteUser} disabled={userProcessing}>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteUser}
+              disabled={userProcessing}
+            >
               <Trash2 className="h-4 w-4 mr-1" />
               {userProcessing ? 'Removing…' : 'Remove User'}
             </Button>
@@ -910,58 +914,60 @@ const AdminDashboard = () => {
       <Dialog open={userDialog === 'create'} onOpenChange={(o) => { if (!o) setUserDialog(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-foreground">Invite New User</DialogTitle>
-            <DialogDescription className="text-sm font-medium text-muted-foreground">
+            <DialogTitle>Invite New User</DialogTitle>
+            <DialogDescription>
               An invite email will be sent. They set their own password on first login.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-foreground">Email <span className="text-destructive">*</span></Label>
+              <Label>Email <span className="text-destructive">*</span></Label>
               <Input
                 type="email"
                 value={newUserForm.email}
                 onChange={(e) => setNewUserForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="user@example.com"
-                className="font-medium"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-foreground">Full Name</Label>
+              <Label>Full Name</Label>
               <Input
                 value={newUserForm.full_name}
                 onChange={(e) => setNewUserForm((f) => ({ ...f, full_name: e.target.value }))}
                 placeholder="Jane Smith"
-                className="font-medium"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-foreground">Phone</Label>
+              <Label>Phone</Label>
               <Input
                 value={newUserForm.phone}
                 onChange={(e) => setNewUserForm((f) => ({ ...f, phone: e.target.value }))}
                 placeholder="+267 71 234 567"
-                className="font-medium"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-foreground">Role</Label>
+              <Label>Role</Label>
               <Select
                 value={newUserForm.role}
                 onValueChange={(v) => setNewUserForm((f) => ({ ...f, role: v as UserRow['role'] }))}
               >
-                <SelectTrigger className="font-medium"><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="patient" className="font-medium">Patient</SelectItem>
-                  <SelectItem value="pharmacist" className="font-medium">Pharmacist</SelectItem>
-                  <SelectItem value="admin" className="font-medium">Admin</SelectItem>
+                  <SelectItem value="patient">Patient</SelectItem>
+                  <SelectItem value="pharmacist">Pharmacist</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter className="pt-2">
-            <Button variant="outline" className="font-semibold" onClick={() => setUserDialog(null)}>Cancel</Button>
-            <Button className="font-semibold" onClick={handleCreateUser} disabled={userProcessing || !newUserForm.email}>
+            <Button variant="outline" onClick={() => setUserDialog(null)}>Cancel</Button>
+            <Button
+              onClick={handleCreateUser}
+              disabled={userProcessing || !newUserForm.email}
+            >
               <UserPlus className="h-4 w-4 mr-1" />
               {userProcessing ? 'Sending…' : 'Send Invite'}
             </Button>
@@ -974,18 +980,17 @@ const AdminDashboard = () => {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="pt-2">
-    <h4 className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-2 border-b border-border pb-1.5">{title}</h4>
-    <div className="space-y-1.5">{children}</div>
+    <h4 className="font-semibold text-foreground mb-1 border-b pb-1">{title}</h4>
+    <div className="space-y-1">{children}</div>
   </div>
 );
 
 const Detail = ({ label, value }: { label: string; value: string }) => (
   <div className="flex justify-between gap-4">
-    <span className="text-muted-foreground font-medium shrink-0">{label}</span>
-    <span className="text-foreground font-semibold text-right">{value}</span>
+    <span className="text-muted-foreground shrink-0">{label}:</span>
+    <span className="text-foreground font-medium text-right">{value}</span>
   </div>
 );
 
