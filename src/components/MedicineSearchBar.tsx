@@ -95,15 +95,21 @@ const MedicineSearchBar = ({ large = false, className = '' }: MedicineSearchBarP
     setQuery(suggestion.name);
     setShowDropdown(false);
     setSuggestions([]);
-    navigate(`/search?q=${encodeURIComponent(suggestion.name)}`);
-  }, [navigate]);
+    // Preserve pharmacy_id / pharmacy_name params if present
+    const params = new URLSearchParams(searchParams);
+    params.set('q', suggestion.name);
+    navigate(`/search?${params.toString()}`);
+  }, [navigate, searchParams]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = query.trim();
     if (trimmed) {
       setShowDropdown(false);
-      navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+      // Preserve pharmacy_id / pharmacy_name params if present
+      const params = new URLSearchParams(searchParams);
+      params.set('q', trimmed);
+      navigate(`/search?${params.toString()}`);
     }
   };
 
