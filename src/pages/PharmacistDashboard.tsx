@@ -312,15 +312,14 @@ const PharmacistDashboard = () => {
     toast.success(`Imported ${successCount} items${errorCount > 0 ? `, ${errorCount} failed (medicine not found)` : ''}`);
   };
 
-  // ── Fetch reservations ────────────────────────────────────────────────────
-  // ── Fetch reservations ────────────────────────────────────────────────────
+ // ── Fetch reservations ────────────────────────────────────────────────────
 const fetchReservations = useCallback(async () => {
   if (!myPharmacies.length) return;
   setResLoading(true);
 
   const pharmacyIds = myPharmacies.map(p => p.id);
 
-  // Fetch reservations
+  // Fetch reservations — filtered strictly to this pharmacist's pharmacy IDs
   const { data, error } = await (supabase as any)
     .from('reservations')
     .select('id, pharmacy_id, medicine_id, user_id, quantity, status, requested_at, expiry_at, reference')
@@ -338,7 +337,6 @@ const fetchReservations = useCallback(async () => {
   const pharmacyIdsUniq = [...new Set((data ?? []).map((r: any) => r.pharmacy_id).filter(Boolean))];
   const userIds         = [...new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean))];
 
-  // Try to fetch profiles with all possible name fields
   const [medRes, pharRes, profileRes] = await Promise.all([
     medicineIds.length
       ? (supabase as any).from('medicines').select('id, name').in('id', medicineIds)
@@ -347,10 +345,7 @@ const fetchReservations = useCallback(async () => {
       ? (supabase as any).from('pharmacies').select('id, name').in('id', pharmacyIdsUniq)
       : { data: [] },
     userIds.length
-      ? (supabase as any)
-          .from('profiles')
-          .select('user_id, full_name, name, display_name, first_name, last_name, email')
-          .in('user_id', userIds)
+      ? (supabase as any).from('profiles').select('user_id, full_name').in('user_id', userIds)
       : { data: [] },
   ]);
 
@@ -360,27 +355,8 @@ const fetchReservations = useCallback(async () => {
   
   (medRes.data ?? []).forEach((m: any) => { medMap[m.id] = m.name; });
   (pharRes.data ?? []).forEach((p: any) => { pharMap[p.id] = p.name; });
-  
-  // Try to get the best available name
   (profileRes.data ?? []).forEach((p: any) => { 
-    let patientName = 'Patient';
-    
-    if (p.full_name && p.full_name !== '') {
-      patientName = p.full_name;
-    } else if (p.name && p.name !== '') {
-      patientName = p.name;
-    } else if (p.display_name && p.display_name !== '') {
-      patientName = p.display_name;
-    } else if (p.first_name && p.last_name) {
-      patientName = `${p.first_name} ${p.last_name}`;
-    } else if (p.first_name) {
-      patientName = p.first_name;
-    } else if (p.email) {
-      // Use email username as fallback
-      patientName = p.email.split('@')[0];
-    }
-    
-    profileMap[p.user_id] = patientName;
+    profileMap[p.user_id] = p.full_name || 'Patient';
   });
 
   setReservations((data ?? []).map((r: any) => ({
