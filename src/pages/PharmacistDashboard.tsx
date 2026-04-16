@@ -313,58 +313,84 @@ const PharmacistDashboard = () => {
   };
 
   // ── Fetch reservations ────────────────────────────────────────────────────
-  const fetchReservations = useCallback(async () => {
-    if (!myPharmacies.length) return;
-    setResLoading(true);
+  // ── Fetch reservations ────────────────────────────────────────────────────
+const fetchReservations = useCallback(async () => {
+  if (!myPharmacies.length) return;
+  setResLoading(true);
 
-    const pharmacyIds = myPharmacies.map(p => p.id);
+  const pharmacyIds = myPharmacies.map(p => p.id);
 
-    // Fetch reservations — filtered strictly to this pharmacist's pharmacy IDs
-    // pharmacyIds is already scoped to owner_id = user.id from the access check
-    const { data, error } = await (supabase as any)
-      .from('reservations')
-      .select('id, pharmacy_id, medicine_id, user_id, quantity, status, requested_at, expiry_at, reference')
-      .in('pharmacy_id', pharmacyIds)
-      .order('requested_at', { ascending: false });
+  // Fetch reservations
+  const { data, error } = await (supabase as any)
+    .from('reservations')
+    .select('id, pharmacy_id, medicine_id, user_id, quantity, status, requested_at, expiry_at, reference')
+    .in('pharmacy_id', pharmacyIds)
+    .order('requested_at', { ascending: false });
 
-    if (error) {
-      console.warn('Reservations query:', error.message);
-      setReservations([]);
-      setResLoading(false);
-      return;
-    }
-
-    const medicineIds     = [...new Set((data ?? []).map((r: any) => r.medicine_id).filter(Boolean))];
-    const pharmacyIdsUniq = [...new Set((data ?? []).map((r: any) => r.pharmacy_id).filter(Boolean))];
-    const userIds         = [...new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean))];
-
-    const [medRes, pharRes, profileRes] = await Promise.all([
-      medicineIds.length
-        ? (supabase as any).from('medicines').select('id, name').in('id', medicineIds)
-        : { data: [] },
-      pharmacyIdsUniq.length
-        ? (supabase as any).from('pharmacies').select('id, name').in('id', pharmacyIdsUniq)
-        : { data: [] },
-      userIds.length
-        ? (supabase as any).from('profiles').select('user_id, full_name').in('user_id', userIds)
-        : { data: [] },
-    ]);
-
-    const medMap:     Record<string, string> = {};
-    const pharMap:    Record<string, string> = {};
-    const profileMap: Record<string, string> = {};
-    (medRes.data     ?? []).forEach((m: any) => { medMap[m.id]          = m.name; });
-    (pharRes.data    ?? []).forEach((p: any) => { pharMap[p.id]         = p.name; });
-    (profileRes.data ?? []).forEach((p: any) => { profileMap[p.user_id] = p.full_name ?? 'Patient'; });
-
-    setReservations((data ?? []).map((r: any) => ({
-      ...r,
-      medicine_name: medMap[r.medicine_id]  ?? '—',
-      pharmacy_name: pharMap[r.pharmacy_id] ?? '—',
-      patient_name:  profileMap[r.user_id]  ?? 'Patient',
-    })));
+  if (error) {
+    console.warn('Reservations query:', error.message);
+    setReservations([]);
     setResLoading(false);
-  }, [myPharmacies]);
+    return;
+  }
+
+  const medicineIds     = [...new Set((data ?? []).map((r: any) => r.medicine_id).filter(Boolean))];
+  const pharmacyIdsUniq = [...new Set((data ?? []).map((r: any) => r.pharmacy_id).filter(Boolean))];
+  const userIds         = [...new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean))];
+
+  // Try to fetch profiles with all possible name fields
+  const [medRes, pharRes, profileRes] = await Promise.all([
+    medicineIds.length
+      ? (supabase as any).from('medicines').select('id, name').in('id', medicineIds)
+      : { data: [] },
+    pharmacyIdsUniq.length
+      ? (supabase as any).from('pharmacies').select('id, name').in('id', pharmacyIdsUniq)
+      : { data: [] },
+    userIds.length
+      ? (supabase as any)
+          .from('profiles')
+          .select('user_id, full_name, name, display_name, first_name, last_name, email')
+          .in('user_id', userIds)
+      : { data: [] },
+  ]);
+
+  const medMap:     Record<string, string> = {};
+  const pharMap:    Record<string, string> = {};
+  const profileMap: Record<string, string> = {};
+  
+  (medRes.data ?? []).forEach((m: any) => { medMap[m.id] = m.name; });
+  (pharRes.data ?? []).forEach((p: any) => { pharMap[p.id] = p.name; });
+  
+  // Try to get the best available name
+  (profileRes.data ?? []).forEach((p: any) => { 
+    let patientName = 'Patient';
+    
+    if (p.full_name && p.full_name !== '') {
+      patientName = p.full_name;
+    } else if (p.name && p.name !== '') {
+      patientName = p.name;
+    } else if (p.display_name && p.display_name !== '') {
+      patientName = p.display_name;
+    } else if (p.first_name && p.last_name) {
+      patientName = `${p.first_name} ${p.last_name}`;
+    } else if (p.first_name) {
+      patientName = p.first_name;
+    } else if (p.email) {
+      // Use email username as fallback
+      patientName = p.email.split('@')[0];
+    }
+    
+    profileMap[p.user_id] = patientName;
+  });
+
+  setReservations((data ?? []).map((r: any) => ({
+    ...r,
+    medicine_name: medMap[r.medicine_id] ?? '—',
+    pharmacy_name: pharMap[r.pharmacy_id] ?? '—',
+    patient_name:  profileMap[r.user_id] ?? 'Patient',
+  })));
+  setResLoading(false);
+}, [myPharmacies]);
 
   // ── Fetch inventory ───────────────────────────────────────────────────────
   const fetchInventory = useCallback(async () => {
