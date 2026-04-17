@@ -93,15 +93,19 @@ const ReviewsPage = () => {
       const pharmacyMap: Record<string, string> = {};
       (pharmacies ?? []).forEach((p: any) => { pharmacyMap[p.id] = p.name; });
 
-      // Get patient names from profiles
-      const userIds = [...new Set(reviewsData.map((r: any) => r.user_id))];
-      const { data: profiles } = await (supabase
-        .from('profiles' as any)
-        .select('user_id, full_name')
-        .in('user_id', userIds) as any);
+      // Get patient names using the RPC function
+        const userIds = [...new Set(reviewsData.map((r: any) => r.user_id))];
+        const { data: patientNames, error: namesError } = await (supabase
+        .rpc('get_patient_names' as any, { user_ids: userIds }));
 
-      const profileMap: Record<string, string> = {};
-      (profiles ?? []).forEach((p: any) => { profileMap[p.user_id] = p.full_name || 'Patient'; });
+        if (namesError) {
+        console.error('Error fetching patient names:', namesError);
+        setLoading(false);}
+
+        const patientNameMap: Record<string, string> = {};
+        (patientNames ?? []).forEach((p: any) => {
+            patientNameMap[p.user_id] = p.full_name || 'Patient';
+        });
 
       const enrichedReviews: Review[] = reviewsData.map((r: any) => ({
         id: r.id,
@@ -110,7 +114,7 @@ const ReviewsPage = () => {
         created_at: r.created_at,
         pharmacy_id: r.pharmacy_id,
         pharmacy_name: pharmacyMap[r.pharmacy_id] || 'Unknown Pharmacy',
-        patient_name: profileMap[r.user_id] || 'Patient',
+        patient_name: patientNameMap[r.user_id] || 'Patient',
         user_id: r.user_id,
       }));
 
@@ -279,7 +283,7 @@ const ReviewsPage = () => {
             Patient Reviews
           </h1>
           <p className="mt-1 sm:mt-2 text-sm sm:text-base text-muted-foreground">
-            See what people are saying about pharmacies
+            See what people are saying about pharmacies in Gaborone
           </p>
         </div>
 
@@ -409,7 +413,7 @@ const ReviewsPage = () => {
                       key={review.id}
                       className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm transition-all hover:shadow-md"
                     >
-                      {/* Header row - pharmacy name and rating on mobile */}
+                      {/* Header row - pharmacy name and rating */}
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
