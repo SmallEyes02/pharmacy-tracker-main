@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/Header';
 import MedicineSearchBar from '@/components/MedicineSearchBar';
 import AvailabilityCard from '@/components/AvailabilityCard';
-import { Pill, AlertTriangle, Loader2, MapPin } from 'lucide-react';
+import { Pill, AlertTriangle, Loader2, MapPin, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLocationContext } from '@/contexts/LocationContext';
 import { haversineDistance, estimateTravelTime } from '@/hooks/useUserLocation';
@@ -48,13 +47,10 @@ const parseCoords = (location: any): { lat: number; lng: number } | null => {
   }
 
   // ── WKB hex format (PostGIS EWKB) ────────────────────────────────────────
-  // Supabase returns geography columns as hex-encoded WKB when selected via JS.
-  // Structure (little-endian): [1 byte order][4 type][4 SRID][8 X/lng][8 Y/lat]
   if (typeof location === "string" && /^[0-9A-Fa-f]+$/.test(location) && location.length >= 42) {
     try {
       const hex = location;
       const readDouble = (offset: number): number => {
-        // Read 8 bytes as little-endian double
         let bytes = "";
         for (let i = 7; i >= 0; i--) {
           bytes += hex.slice(offset + i * 2, offset + i * 2 + 2);
@@ -64,12 +60,11 @@ const parseCoords = (location: any): { lat: number; lng: number } | null => {
         for (let i = 0; i < 8; i++) {
           view.setUint8(i, parseInt(bytes.slice(i * 2, i * 2 + 2), 16));
         }
-        return view.getFloat64(0, false); // big-endian after manual reversal
+        return view.getFloat64(0, false);
       };
 
-      // Byte 0: byte order. Bytes 1-4: type. Bytes 5-8: SRID. Bytes 9-16: X. Bytes 17-24: Y
-      const lng = readDouble(18); // offset 9 bytes = 18 hex chars
-      const lat = readDouble(34); // offset 17 bytes = 34 hex chars
+      const lng = readDouble(18);
+      const lat = readDouble(34);
       if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
         return { lat, lng };
       }
@@ -141,12 +136,12 @@ const sortByDistance = (items: any[]) =>
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const query      = searchParams.get('q') || '';
-  const forMed     = searchParams.get('for') || '';       // original out-of-stock medicine name
-  const isAltMode  = searchParams.get('alternatives') === '1'; // came from "See alternatives" card
+  const pharmacyId = searchParams.get('pharmacy_id') || '';
+  const pharmacyName = searchParams.get('pharmacy_name') || '';
 
   const { userLocation } = useLocationContext();
 
-  // Raw results from Supabase — fetched once per query
+  // Raw results from Supabase — fetched once per query/pharmacy change
   const [rawResults, setRawResults]         = useState<RawResult[]>([]);
   // Enriched results with distance — recalculated when location changes
   const [results, setResults]               = useState<any[]>([]);
@@ -155,9 +150,10 @@ const SearchPage = () => {
   const [alternatives, setAlternatives]     = useState<{ id: string; name: string; strength: string | null; dosage_form: string | null; category: string | null }[]>([]);
   const [altLoading, setAltLoading]         = useState(false);
 
-  // ── Step 1: Fetch from Supabase when query changes ────────────────────────
+  // ── Step 1: Fetch from Supabase when query or pharmacy changes ──────────
   useEffect(() => {
-    if (!query.trim()) {
+    // If no query and no pharmacy selected, don't fetch anything
+    if (!query.trim() && !pharmacyId) {
       setRawResults([]);
       setResults([]);
       setAlternatives([]);
@@ -167,7 +163,8 @@ const SearchPage = () => {
     const fetch = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await (supabase
+        // Start building the query
+        let queryBuilder = (supabase
           .from('pharmacy_inventory' as any)
           .select(`
             id, price, stock_level,
@@ -179,11 +176,22 @@ const SearchPage = () => {
             medicines:medicine_id (
               id, name, description, category, dosage_form, strength
             )
-          `)
-          .or(
+          `) as any);
+
+        // Apply pharmacy filter if present
+        if (pharmacyId) {
+          queryBuilder = queryBuilder.eq('pharmacy_id', pharmacyId);
+        }
+
+        // Apply medicine search filter if present
+        if (query.trim()) {
+          queryBuilder = queryBuilder.or(
             `name.ilike.%${query}%,category.ilike.%${query}%`,
             { foreignTable: 'medicines' as any }
-          ) as any);
+          );
+        }
+
+        const { data, error } = await queryBuilder;
 
         if (error) throw error;
 
@@ -193,14 +201,13 @@ const SearchPage = () => {
 
         setRawResults(valid);
 
-        // ── Fetch alternatives if all results are out of stock ────────────
+        // ── Fetch alternatives if all results are out of stock AND we have a query ──
         const allOutOfStock = valid.length > 0 && valid.every((r: any) => r.stock_level === 0);
         const noResults     = valid.length === 0;
 
-        if (allOutOfStock || noResults) {
+        if ((allOutOfStock || noResults) && query.trim()) {
           setAltLoading(true);
           try {
-            // Find medicine IDs matching the query
             const { data: matchedMeds } = await (supabase as any)
               .from('medicines')
               .select('id')
@@ -208,7 +215,6 @@ const SearchPage = () => {
 
             if (matchedMeds?.length) {
               const medIds = matchedMeds.map((m: any) => m.id);
-              // Fetch alternatives for those medicines
               const { data: altData } = await (supabase as any)
                 .from('medicine_alternatives')
                 .select('alternative_id, medicines!alternative_id(id, name, strength, dosage_form, category)')
@@ -218,7 +224,6 @@ const SearchPage = () => {
               const alts = (altData ?? [])
                 .map((a: any) => a.medicines)
                 .filter(Boolean)
-                // Remove duplicates
                 .filter((m: any, i: number, arr: any[]) => arr.findIndex(x => x.id === m.id) === i);
 
               setAlternatives(alts);
@@ -244,15 +249,18 @@ const SearchPage = () => {
     };
 
     fetch();
-  }, [query]); // only re-fetch when query changes
+  }, [query, pharmacyId]); // Re-fetch when query OR pharmacy changes
 
   // ── Step 2: Recalculate distances when raw results OR location changes ─────
-  // This runs instantly when location resolves — no extra network call
   useEffect(() => {
     if (!rawResults.length) { setResults([]); return; }
     const enriched = rawResults.map(r => enrichWithDistance(r, userLocation));
     setResults(sortByDistance(enriched));
   }, [rawResults, userLocation]);
+
+  // Helper to determine what we're showing
+  const hasPharmacyFilter = !!pharmacyId;
+  const hasSearchQuery = !!query.trim();
 
   return (
     <div className="min-h-screen bg-background">
@@ -262,25 +270,31 @@ const SearchPage = () => {
           <MedicineSearchBar />
         </div>
 
-        {/* Alternatives context banner — shown when navigated from a card's "See alternatives" */}
-        {isAltMode && forMed && !isLoading && (
-          <div className="mx-auto max-w-4xl mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-bold text-destructive">
-                {forMed} is out of stock
+        {/* Pharmacy context banner — shown when filtering by pharmacy */}
+        {hasPharmacyFilter && pharmacyName && (
+          <div className="mx-auto max-w-4xl mb-6 flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+            <Store className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-primary">
+                Showing stock at {pharmacyName}
               </p>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Showing medicines that may be used as alternatives to{' '}
-                <span className="font-semibold text-foreground">{forMed}</span>.
-                These are not automatic substitutes — please confirm with your pharmacist or doctor before switching.
+                {hasSearchQuery 
+                  ? `Results for "${query}" filtered to this pharmacy only.`
+                  : `Browse all ${results.length} medicines available at this pharmacy.`}
               </p>
             </div>
+            <Link 
+              to={`/search?q=${encodeURIComponent(query)}`}
+              className="text-sm font-semibold text-primary hover:underline shrink-0"
+            >
+              Search all pharmacies →
+            </Link>
           </div>
         )}
 
         {/* Location banner */}
-        {!userLocation && query && !isLoading && (
+        {!userLocation && !isLoading && (hasSearchQuery || hasPharmacyFilter) && (
           <div className="mx-auto max-w-2xl mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-4 py-2 text-sm text-warning">
             <MapPin className="h-4 w-4 shrink-0" />
             Enable location access to see real distances.
@@ -294,10 +308,13 @@ const SearchPage = () => {
           </div>
         ) : (
           <div>
-            {query && results.length > 0 ? (
+            {((hasSearchQuery || hasPharmacyFilter) && results.length > 0) ? (
               <>
                 <p className="mb-4 text-sm text-muted-foreground">
-                  {results.length} result{results.length !== 1 ? 's' : ''} for &ldquo;{query}&rdquo;
+                  {hasPharmacyFilter && !hasSearchQuery 
+                    ? `${results.length} medicine${results.length !== 1 ? 's' : ''} in stock at ${pharmacyName}`
+                    : `${results.length} result${results.length !== 1 ? 's' : ''} for "${query}"${hasPharmacyFilter ? ` at ${pharmacyName}` : ''}`
+                  }
                   {userLocation ? ' · sorted by distance' : ''}
                 </p>
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -306,13 +323,33 @@ const SearchPage = () => {
                   ))}
                 </div>
               </>
-            ) : query && !isLoading ? (
+            ) : (hasSearchQuery || hasPharmacyFilter) && !isLoading ? (
               <div className="mt-16 flex flex-col items-center text-center">
                 <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-bold">No results for &ldquo;{query}&rdquo;</h3>
-                <p className="text-muted-foreground">Try &ldquo;Panado&rdquo;, &ldquo;Amoxicillin&rdquo; or &ldquo;Vitamin C&rdquo;</p>
+                <h3 className="text-xl font-bold">
+                  {hasPharmacyFilter && !hasSearchQuery
+                    ? `No medicines found at ${pharmacyName}`
+                    : hasPharmacyFilter
+                    ? `No results for "${query}" at ${pharmacyName}`
+                    : `No results for "${query}"`
+                  }
+                </h3>
+                <p className="text-muted-foreground mt-2">
+                  {hasPharmacyFilter
+                    ? `Try a different search term or ${!hasSearchQuery ? 'search for a specific medicine' : 'browse all medicines at this pharmacy'}`
+                    : 'Try "Panado", "Amoxicillin" or "Vitamin C"'
+                  }
+                </p>
+                {hasPharmacyFilter && (
+                  <Link 
+                    to={`/search?q=${encodeURIComponent(query)}`}
+                    className="mt-4 text-primary font-semibold hover:underline"
+                  >
+                    Search all pharmacies instead →
+                  </Link>
+                )}
               </div>
-            ) : !query ? (
+            ) : !hasSearchQuery && !hasPharmacyFilter ? (
               <div className="mt-20 flex flex-col items-center text-center opacity-70">
                 <Pill className="h-16 w-16 mb-4 text-primary" />
                 <h3 className="text-lg font-semibold">Search for Medicines</h3>
@@ -320,10 +357,9 @@ const SearchPage = () => {
               </div>
             ) : null}
 
-            {/* ── Alternative medicines suggestion ── */}
-            {!isLoading && query && alternatives.length > 0 && (
+            {/* ── Alternative medicines suggestion (only shown when query exists) ── */}
+            {!isLoading && hasSearchQuery && alternatives.length > 0 && (
               <div className="mt-10">
-                {/* Context banner */}
                 <div className={`rounded-xl border p-4 mb-6 flex items-start gap-3 ${
                   results.length === 0
                     ? 'border-warning/30 bg-warning/8'
@@ -365,6 +401,8 @@ const SearchPage = () => {
                         onClick={() => {
                           const params = new URLSearchParams(window.location.search);
                           params.set('q', alt.name);
+                          if (pharmacyId) params.set('pharmacy_id', pharmacyId);
+                          if (pharmacyName) params.set('pharmacy_name', pharmacyName);
                           window.location.search = params.toString();
                         }}
                         className="rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/50 hover:shadow-md group"
