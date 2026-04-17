@@ -279,7 +279,7 @@ const ReviewsPage = () => {
             Patient Reviews
           </h1>
           <p className="mt-1 sm:mt-2 text-sm sm:text-base text-muted-foreground">
-            See what people are saying about pharmacies in Gaborone
+            See what people are saying about pharmacies
           </p>
         </div>
 
