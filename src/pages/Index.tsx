@@ -446,10 +446,10 @@ const Index = () => {
       <section className="container py-16">
         <div className="text-center mb-10">
           <h2 className="font-heading text-3xl font-bold text-foreground">
-            What Patients Are Saying
+            What Other People Are Saying
           </h2>
           <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
-            Real reviews from real people about their pharmacy experiences in Gaborone
+            Real reviews from real people about their pharmacy experiences
           </p>
         </div>
 
