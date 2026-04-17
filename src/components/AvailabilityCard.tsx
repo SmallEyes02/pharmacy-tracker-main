@@ -5,6 +5,7 @@ import {
   DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { RatingBadge } from '@/components/PharmacyReviews';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +13,7 @@ import { useState } from 'react';
 import {
   MapPin, Clock, Navigation, ShoppingBag,
   Building2, Pill, CalendarClock, CheckCircle,
-  MessageCircle, ShieldCheck,
+  MessageCircle, ShieldCheck, Star,
   AlertTriangle, ArrowRight,
 } from 'lucide-react';
 
@@ -139,7 +140,10 @@ const AvailabilityCard = ({ item }: AvailabilityCardProps) => {
         {/* Pharmacy + distance + price */}
         <div className="mt-3 flex items-center justify-between">
           <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
             <p className="truncate text-sm font-medium text-muted-foreground">{pharmacy.name}</p>
+            <RatingBadge pharmacyId={pharmacy.id} />
+          </div>
             <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
               {hasDistance ? (
                 <>

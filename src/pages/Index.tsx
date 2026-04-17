@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Pill, Clock, Shield, ArrowRight, Search, Loader2, Navigation } from 'lucide-react';
+import { MapPin, Pill, Clock, Shield, ArrowRight, Search, Loader2, Navigation, Star, MessageSquare, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useNavigate } from 'react-router-dom';
 import MedicineSearchBar from '@/components/MedicineSearchBar';
@@ -52,6 +52,15 @@ interface NearbyPharmacy {
   travelTime: number;
 }
 
+interface FeaturedReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  pharmacy_name: string;
+  patient_name: string;
+}
+
 // ── Static content ─────────────────────────────────────────────────────────────
 const features = [
   {
@@ -77,6 +86,25 @@ const features = [
 ];
 
 const popularMeds = ['Panadol', 'Amoxicillin', 'Omeprazole', 'Ibuprofen'];
+
+// ── Star Rating Display Component ─────────────────────────────────────────────
+const StarRatingDisplay = ({ rating, size = 'sm' }: { rating: number; size?: 'xs' | 'sm' | 'md' }) => {
+  const dims = size === 'xs' ? 'h-3 w-3' : size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4';
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map(s => (
+        <Star
+          key={s}
+          className={`${dims} ${
+            s <= Math.round(rating)
+              ? 'fill-warning text-warning'
+              : 'text-muted-foreground/30'
+          }`}
+        />
+      ))}
+    </div>
+  );
+};
 
 // ── Pharmacy card ─────────────────────────────────────────────────────────────
 const NearbyCard = ({ pharmacy }: { pharmacy: NearbyPharmacy }) => {
@@ -181,6 +209,8 @@ const Index = () => {
   const [rawPharmacies, setRawPharmacies] = useState<any[]>([]);
   const [pharmacies, setPharmacies]       = useState<NearbyPharmacy[]>([]);
   const [pharmaLoading, setPharmaLoading] = useState(true);
+  const [featuredReviews, setFeaturedReviews] = useState<FeaturedReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
 
   // Step 1: Fetch pharmacies once — no location dependency
   useEffect(() => {
@@ -198,7 +228,72 @@ const Index = () => {
     load();
   }, []); // fetch once on mount
 
-  // Step 2: Recalculate distances when raw data OR location changes
+  // Step 2: Fetch featured reviews
+  useEffect(() => {
+    const fetchFeaturedReviews = async () => {
+      setReviewsLoading(true);
+      
+      const { data, error } = await (supabase
+        .from('reviews' as any)
+        .select(`
+          id,
+          rating,
+          comment,
+          created_at,
+          pharmacy_id,
+          user_id
+        `)
+        .order('created_at', { ascending: false })
+        .limit(6) as any);
+
+      if (error) {
+        console.error('Error fetching reviews:', error);
+        setReviewsLoading(false);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        setReviewsLoading(false);
+        return;
+      }
+
+      // Get pharmacy names
+      const pharmacyIds = [...new Set(data.map((r: any) => r.pharmacy_id))];
+      const { data: pharmacies } = await (supabase
+        .from('pharmacies' as any)
+        .select('id, name')
+        .in('id', pharmacyIds) as any);
+
+      const pharmacyMap: Record<string, string> = {};
+      (pharmacies ?? []).forEach((p: any) => { pharmacyMap[p.id] = p.name; });
+
+      // Get patient names from profiles
+      const userIds = [...new Set(data.map((r: any) => r.user_id))];
+      const { data: profiles } = await (supabase
+        .from('profiles' as any)
+        .select('user_id, full_name')
+        .in('user_id', userIds) as any);
+
+      const profileMap: Record<string, string> = {};
+      (profiles ?? []).forEach((p: any) => { profileMap[p.user_id] = p.full_name || 'Patient'; });
+
+      const enriched = data.map((r: any) => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        created_at: r.created_at,
+        pharmacy_name: pharmacyMap[r.pharmacy_id] || 'Pharmacy',
+        patient_name: profileMap[r.user_id] || 'Patient',
+      }));
+
+      setFeaturedReviews(enriched);
+      setReviewsLoading(false);
+    };
+
+    fetchFeaturedReviews();
+  }, []);
+
+  // Step 3: Recalculate distances when raw data OR location changes
   useEffect(() => {
     if (!rawPharmacies.length) return;
 
@@ -345,6 +440,78 @@ const Index = () => {
             </Button>
           </Link>
         </div>
+      </section>
+
+      {/* ── Featured Reviews Section ── */}
+      <section className="container py-16">
+        <div className="text-center mb-10">
+          <h2 className="font-heading text-3xl font-bold text-foreground">
+            What Patients Are Saying
+          </h2>
+          <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
+            Real reviews from real people about their pharmacy experiences in Gaborone
+          </p>
+        </div>
+
+        {reviewsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : featuredReviews.length === 0 ? (
+          <div className="text-center py-12">
+            <MessageSquare className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">No reviews yet. Be the first to leave one!</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {featuredReviews.map((review) => (
+                <div
+                  key={review.id}
+                  className="rounded-xl border border-border bg-card p-5 shadow-card transition-all duration-300 hover:shadow-elevated hover:-translate-y-1 group"
+                >
+                  {/* Stars */}
+                  <div className="mb-3">
+                    <StarRatingDisplay rating={review.rating} size="sm" />
+                  </div>
+
+                  {/* Comment */}
+                  <p className="text-sm text-card-foreground leading-relaxed line-clamp-3">
+                    &ldquo;{review.comment || 'No comment provided.'}&rdquo;
+                  </p>
+
+                  {/* Patient & Pharmacy */}
+                  <div className="mt-4 pt-3 border-t border-border/50">
+                    <p className="text-sm font-semibold text-foreground">
+                      {review.patient_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <span>at</span>
+                      <span className="font-medium text-primary">{review.pharmacy_name}</span>
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">
+                      {new Date(review.created_at).toLocaleDateString('en-BW', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* View all link */}
+            <div className="text-center mt-8">
+              <Link to="/reviews">
+                <Button variant="ghost" className="gap-1 text-primary hover:text-primary">
+                  Read all patient reviews
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </>
+        )}
       </section>
 
       {/* ── Footer ── */}
