@@ -267,15 +267,19 @@ const Index = () => {
       const pharmacyMap: Record<string, string> = {};
       (pharmacies ?? []).forEach((p: any) => { pharmacyMap[p.id] = p.name; });
 
-      // Get patient names from profiles
+      // Get patient names using the RPC function
       const userIds = [...new Set(data.map((r: any) => r.user_id))];
-      const { data: profiles } = await (supabase
-        .from('profiles' as any)
-        .select('user_id, full_name')
-        .in('user_id', userIds) as any);
+      const { data: patientNames, error: namesError } = await (supabase
+        .rpc('get_patient_names' as any, { user_ids: userIds }));
+
+      if (namesError) {
+        console.error('Error fetching patient names:', namesError);
+      }
 
       const profileMap: Record<string, string> = {};
-      (profiles ?? []).forEach((p: any) => { profileMap[p.user_id] = p.full_name || 'Patient'; });
+      (patientNames ?? []).forEach((p: any) => {
+        profileMap[p.user_id] = p.full_name || 'Patient';
+      });
 
       const enriched = data.map((r: any) => ({
         id: r.id,
