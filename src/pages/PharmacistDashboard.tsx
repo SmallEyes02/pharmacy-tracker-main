@@ -335,7 +335,8 @@ const fetchReservations = useCallback(async () => {
 
   const medicineIds     = [...new Set((data ?? []).map((r: any) => r.medicine_id).filter(Boolean))];
   const pharmacyIdsUniq = [...new Set((data ?? []).map((r: any) => r.pharmacy_id).filter(Boolean))];
-  const userIds         = [...new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean))];
+  const userIds         = [...new Set((data ?? []).map((r: any) => r.user_id).filter((id: any) => typeof id === 'string' && id.length > 0))];
+
 
   const [medRes, pharRes, profileRes] = await Promise.all([
     medicineIds.length
@@ -349,21 +350,22 @@ const fetchReservations = useCallback(async () => {
       : { data: [] },
   ]);
 
+
   const medMap:     Record<string, string> = {};
   const pharMap:    Record<string, string> = {};
   const profileMap: Record<string, string> = {};
   
   (medRes.data ?? []).forEach((m: any) => { medMap[m.id] = m.name; });
   (pharRes.data ?? []).forEach((p: any) => { pharMap[p.id] = p.name; });
-  (profileRes.data ?? []).forEach((p: any) => { 
-    profileMap[p.user_id] = p.full_name || 'Patient';
+  (profileRes.data ?? []).forEach((p: any) => {
+    profileMap[p.user_id] = p.full_name?.trim() || `Patient #${(p.user_id as string).slice(-4)}`;
   });
 
   setReservations((data ?? []).map((r: any) => ({
     ...r,
     medicine_name: medMap[r.medicine_id] ?? '—',
     pharmacy_name: pharMap[r.pharmacy_id] ?? '—',
-    patient_name:  profileMap[r.user_id] ?? 'Patient',
+    patient_name:  profileMap[r.user_id] ?? `Patient #${(r.user_id as string).slice(-4)}`,
   })));
   setResLoading(false);
 }, [myPharmacies]);
