@@ -372,7 +372,7 @@ const AvailabilityCard = ({ item }: AvailabilityCardProps) => {
             <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
               <CalendarClock className="h-5 w-5 text-warning shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-warning">24-Hour Pickup Window</p>
+                <p className="text-sm font-semibold text-warning">2-Hour Pickup Window</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Your reservation will be held until:
                 </p>

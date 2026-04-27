@@ -110,7 +110,7 @@ const ReservationsPage = () => {
       <Header />
       <div className="container py-8 max-w-4xl">
         <h1 className="font-heading text-3xl font-bold text-foreground">My Reservations</h1>
-        <p className="mt-2 text-muted-foreground">Track and manage your medicine reservations in Gaborone</p>
+        <p className="mt-2 text-muted-foreground">Track and manage your medicine reservations</p>
 
         {reservations.length === 0 ? (
           <div className="mt-16 text-center">
@@ -124,7 +124,7 @@ const ReservationsPage = () => {
               const config = statusConfig[res.status as keyof typeof statusConfig] || statusConfig.pending;
               const StatusIcon = config.icon;
               
-              // Now we use res.medicines and res.pharmacies from our JOIN query
+              // Now my boy we use res.medicines and res.pharmacies from our JOIN query
               const medicineName = res.medicines?.name || 'Unknown Medicine';
               const medicineStrength = res.medicines?.strength || '';
               const pharmacyName = res.pharmacies?.name || 'Unknown Pharmacy';

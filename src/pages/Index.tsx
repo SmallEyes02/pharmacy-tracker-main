@@ -126,14 +126,14 @@ const NearbyCard = ({ pharmacy }: { pharmacy: NearbyPharmacy }) => {
   const inventoryUrl = `/search?pharmacy_id=${pharmacy.id}&pharmacy_name=${encodeURIComponent(pharmacy.name)}`;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-card transition-all duration-300 hover:shadow-elevated hover:-translate-y-1">
+    <div className="rounded-xl border border-border bg-card p-3 sm:p-4 shadow-card transition-all duration-300 hover:shadow-elevated hover:-translate-y-0.5 w-full flex flex-col">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-heading font-semibold text-card-foreground truncate">
+          <p className="font-heading font-semibold text-sm sm:text-base text-card-foreground leading-snug line-clamp-2">
             {pharmacy.name}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground truncate">{pharmacy.address}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2 leading-snug">{pharmacy.address}</p>
         </div>
         {isOpen !== null && (
           <Badge
@@ -150,8 +150,8 @@ const NearbyCard = ({ pharmacy }: { pharmacy: NearbyPharmacy }) => {
       </div>
 
       {/* Distance + medical aid */}
-      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-3">
+      <div className="mt-2.5 flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
           {pharmacy.distance !== '—' && (
             <span className="flex items-center gap-1 font-medium text-primary">
               <Navigation className="h-3 w-3" />
@@ -173,30 +173,30 @@ const NearbyCard = ({ pharmacy }: { pharmacy: NearbyPharmacy }) => {
       </div>
 
       {pharmacy.opening_time && pharmacy.closing_time && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {pharmacy.opening_time.slice(0, 5)} – {pharmacy.closing_time.slice(0, 5)}
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          🕐 {pharmacy.opening_time.slice(0, 5)} – {pharmacy.closing_time.slice(0, 5)}
         </p>
       )}
 
       {/* Action buttons */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 mt-auto pt-2">
         <Button
           size="sm"
           variant="outline"
-          className="gap-1.5 text-xs"
+          className="gap-1.5 text-xs w-full h-9 min-h-[36px]"
           onClick={() => navigate(inventoryUrl)}
         >
-          <Search className="h-3.5 w-3.5" />
-          View Stock
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">View Stock</span>
         </Button>
         <Button
           size="sm"
           variant="outline"
-          className="gap-1.5 text-xs"
+          className="gap-1.5 text-xs w-full h-9 min-h-[36px]"
           onClick={() => navigate(mapUrl)}
         >
-          <MapPin className="h-3.5 w-3.5" />
-          View on Map
+          <MapPin className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">View on Map</span>
         </Button>
       </div>
     </div>
@@ -399,9 +399,9 @@ const Index = () => {
       </section>
 
       {/* ── Nearby Pharmacies ── */}
-      <section className="border-t border-border bg-secondary/30 py-20">
-        <div className="container">
-          <div className="flex items-end justify-between mb-8">
+      <section className="border-t border-border bg-secondary/30 py-10 sm:py-16 md:py-20">
+        <div className="container px-4 sm:px-6">
+          <div className="flex items-end justify-between mb-5 sm:mb-8">
             <div>
               <h2 className="font-heading text-3xl font-bold text-foreground">
                 Nearby Pharmacies
@@ -431,7 +431,7 @@ const Index = () => {
               <p className="text-sm mt-1">Pharmacies will appear here once approved.</p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {pharmacies.map((pharmacy) => (
                 <NearbyCard key={pharmacy.id} pharmacy={pharmacy} />
               ))}

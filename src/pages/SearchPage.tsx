@@ -69,7 +69,7 @@ const parseCoords = (location: any): { lat: number; lng: number } | null => {
         return { lat, lng };
       }
     } catch {
-      // fall through
+      // fall through if things dont go our W.A.Y like ATI once said
     }
   }
 
@@ -304,7 +304,7 @@ const SearchPage = () => {
         {isLoading ? (
           <div className="mt-20 flex flex-col items-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="mt-4 text-muted-foreground italic">Checking Gaborone pharmacies…</p>
+            <p className="mt-4 text-muted-foreground italic">Checking nearby pharmacies…</p>
           </div>
         ) : (
           <div>
